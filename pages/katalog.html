@@ -1,0 +1,24 @@
+
+  <div class="container section">
+    <div class="catalog-layout reveal in">
+      <aside class="filters">
+        <h4>Filter Produk</h4>
+        <div class="fgroup">
+          <label><input type="radio" name="fcat" value="Semua" checked onchange="renderKatalog()"> Semua</label>
+          <label><input type="radio" name="fcat" value="Sofa" onchange="renderKatalog()"> Sofa</label>
+          <label><input type="radio" name="fcat" value="Meja" onchange="renderKatalog()"> Meja</label>
+          <label><input type="radio" name="fcat" value="Kursi" onchange="renderKatalog()"> Kursi</label>
+          <label><input type="radio" name="fcat" value="Lemari" onchange="renderKatalog()"> Lemari</label>
+        </div>
+        <div class="fgroup">
+          <h4>Material</h4>
+          <label><input type="checkbox" class="fmat" value="Kayu Jati" onchange="renderKatalog()"> Kayu Jati</label>
+          <label><input type="checkbox" class="fmat" value="Kayu Mahoni" onchange="renderKatalog()"> Kayu Mahoni</label>
+          <label><input type="checkbox" class="fmat" value="Rotan" onchange="renderKatalog()"> Rotan</label>
+        </div>
+      </aside>
+      <div style="flex:1">
+        <div class="grid cols-3" id="katalogGrid"></div>
+      </div>
+    </div>
+  </div>

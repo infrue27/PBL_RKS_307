@@ -1,0 +1,40 @@
+
+  <div class="container">
+    <div class="auth-wrap reveal in">
+      <div class="auth-side" style="background-image:url('https://images.unsplash.com/photo-1680965585463-386646047473?fm=jpg&amp;q=70&amp;w=900&amp;auto=format&amp;fit=crop')">
+        <div class="auth-eyebrow">Ruang yang terasa seperti rumah</div>
+        <h2>Lupa kata sandi,<br>bukan akhir cerita.</h2>
+        <p>Ikuti langkah singkat berikut untuk mendapatkan kembali akses ke akun Homey Wood Anda.</p>
+      </div>
+      <div class="auth-form">
+        <div id="resetStep1">
+          <h2>Lupa Kata Sandi?</h2>
+          <p class="form-sub">Masukkan email akun Anda, kami akan mengirimkan kode verifikasi.</p>
+          <div class="form-row">
+            <label>Email</label>
+            <div class="input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 6-10 7L2 6"/></svg><input type="email" id="resetEmail" placeholder="nama@email.com"></div>
+          </div>
+          <button class="btn btn-primary btn-block" onclick="sendResetCode()">Kirim Kode Verifikasi</button>
+          <p class="switch-link">Ingat kata sandi Anda? <a onclick="go('login')">Kembali ke Masuk</a></p>
+        </div>
+        <div id="resetStep2" style="display:none">
+          <h2>Verifikasi &amp; Kata Sandi Baru</h2>
+          <p class="form-sub">Kode verifikasi telah dikirim ke <b id="resetEmailShown"></b>. Kode berlaku selama <span id="resetTimer">05:00</span>.</p>
+          <div class="form-row">
+            <label>Kode Verifikasi</label>
+            <div class="input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4 6v6c0 5 3.4 8.7 8 10 4.6-1.3 8-5 8-10V6z"/><path d="m9.5 12 2 2 3.5-4"/></svg><input type="text" id="resetCode" placeholder="Masukkan 6 digit kode" maxlength="6" inputmode="numeric"></div>
+          </div>
+          <div class="form-row">
+            <label>Kata Sandi Baru</label>
+            <div class="input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input type="password" id="resetNewPass" placeholder="Minimal 8 karakter"></div>
+          </div>
+          <div class="form-row">
+            <label>Konfirmasi Kata Sandi Baru</label>
+            <div class="input-wrap"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg><input type="password" id="resetNewPassConfirm" placeholder="Ulangi kata sandi baru"></div>
+          </div>
+          <button class="btn btn-primary btn-block" onclick="confirmResetPassword()">Simpan Kata Sandi Baru</button>
+          <p class="switch-link">Tidak menerima kode? <a onclick="sendResetCode(true)">Kirim ulang kode</a></p>
+        </div>
+      </div>
+    </div>
+  </div>

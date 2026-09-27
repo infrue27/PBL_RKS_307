@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Homey Wood</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div id="routeBar"></div>
+
+<!-- NAVBAR -->
+<nav class="navbar">
+  <div class="container">
+    <div class="brand" onclick="go('home')"><span class="dot"></span>Homey Wood</div>
+    <ul class="nav-links" id="navLinks">
+      <li onclick="go('home')" data-nav="home">Beranda</li>
+      <li onclick="go('katalog')" data-nav="katalog">Katalog</li>
+      <li onclick="go('tentang')" data-nav="tentang">Tentang Kami</li>
+      <li onclick="go('kontak')" data-nav="kontak">Kontak</li>
+    </ul>
+    <div class="nav-right">
+      <div class="icon-btn" onclick="go('keranjang')" id="cartIconWrap">🛒<span class="badge" id="cartBadge" style="display:none">0</span></div>
+      <div class="dropdown" id="profileDropdown">
+        <div class="icon-btn" onclick="onProfileIconClick()">👤</div>
+        <div class="dropdown-menu" id="dropdownMenu"></div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- Halaman dimuat secara dinamis dari folder pages/ -->
+<div id="app"></div>
+
+<!-- Footer utama situs (disembunyikan otomatis di halaman admin) -->
+<div id="siteFooter"></div>
+
+<div class="toast" id="toast"></div>
+
+<script src="js/app.js"></script>
+</body>
+</html>
