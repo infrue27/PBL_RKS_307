@@ -933,9 +933,28 @@ const NAVBAR_HTML = `<nav class="navbar">
         <div class="icon-btn" onclick="onProfileIconClick()">👤</div>
         <div class="dropdown-menu" id="dropdownMenu"></div>
       </div>
+      <button class="icon-btn menu-btn" id="menuBtn" onclick="toggleMenu()" aria-label="Menu" aria-expanded="false"><span class="bars"><i></i><i></i><i></i></span></button>
     </div>
   </div>
-</nav>`;
+</nav>
+<div class="mobile-menu" id="mobileMenu">
+  <a onclick="go('home')" data-nav="home">Beranda</a>
+  <a onclick="go('katalog')" data-nav="katalog">Katalog</a>
+  <a onclick="go('tentang')" data-nav="tentang">Tentang Kami</a>
+  <a onclick="go('kontak')" data-nav="kontak">Kontak</a>
+</div>`;
+
+function toggleMenu(force){
+  const m=document.getElementById("mobileMenu"), b=document.getElementById("menuBtn");
+  if(!m||!b) return;
+  const open = typeof force==="boolean" ? force : !m.classList.contains("open");
+  m.classList.toggle("open",open);
+  b.classList.toggle("open",open);
+  b.setAttribute("aria-expanded",open);
+  document.body.classList.toggle("menu-open",open);
+}
+window.addEventListener("resize",()=>{ if(window.innerWidth>900) toggleMenu(false); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") toggleMenu(false); });
 (async function boot(){
   const page = document.body.dataset.page;
   document.body.insertAdjacentHTML("afterbegin", NAVBAR_HTML);
