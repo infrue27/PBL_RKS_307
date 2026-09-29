@@ -971,7 +971,6 @@ function toggleMenu(force){
 }
 window.addEventListener("resize",()=>{ if(window.innerWidth>900) toggleMenu(false); });
 document.addEventListener("keydown",e=>{ if(e.key==="Escape") toggleMenu(false); });
-
 (async function boot(){
   const page = document.body.dataset.page;
   document.body.insertAdjacentHTML("afterbegin", NAVBAR_HTML);
