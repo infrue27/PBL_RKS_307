@@ -19,7 +19,7 @@ function seedIfEmpty(){
   }
   if(!localStorage.getItem("hw_users")){
     const users = [
-      {id:1,name:"Admin Homey Wood",email:"admin@homeywood.com",phone:"081200000000",address:"Kantor Pusat Homey Wood, Jakarta",password:"admin123",role:"admin",joined:"01 Januari 2026"}
+      {id:1,name:"Admin Homey Wood",username:"admin",email:"admin@homeywood.com",phone:"081200000000",address:"Kantor Pusat Homey Wood, Jakarta",password:"admin123",role:"admin",joined:"01 Januari 2026"}
     ];
     localStorage.setItem("hw_users",JSON.stringify(users));
   }
@@ -45,14 +45,25 @@ const db = {
   saveReviews:(r)=>localStorage.setItem("hw_reviews",JSON.stringify(r))
 };
 
-let session = JSON.parse(sessionStorage.getItem("hw_session")||"null"); // {userId}
 const _ss = (k,d)=>{ try{ const v=sessionStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} };
 let currentDetailId = _ss("hw_detailId", null);
 let currentFilterCat = _ss("hw_filterCat", "Semua");
 
+/* ---------- SESI (dari backend, bukan localStorage lagi) ---------- */
+let _authUser = null; // diisi refreshAuth() saat boot() dan tiap habis login/register/logout
+
 function currentUser(){
-  if(!session) return null;
-  return db.users().find(u=>u.id===session.userId) || null;
+  return _authUser;
+}
+
+async function refreshAuth(){
+  try{
+    const res = await fetch("/api/me");
+    const data = await res.json();
+    _authUser = data.user;
+  }catch(e){
+    _authUser = null;
+  }
 }
 function fmt(n){ return "Rp " + n.toLocaleString("id-ID"); }
 function toast(msg){
@@ -161,47 +172,63 @@ function adminHeaderHTML(title,subtitle){
 }
 
 /* ---------- AUTH ---------- */
-function doLogin(){
+async function apiPost(url, body){
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {"Content-Type": "application/json"},
+    body: JSON.stringify(body || {})
+  });
+  let data = {};
+  try{ data = await res.json(); }catch(e){ /* respons kosong, misal 204 */ }
+  return {ok: res.ok, status: res.status, data};
+}
+
+async function doLogin(){
   const email = document.getElementById("loginEmail").value.trim();
   const pass = document.getElementById("loginPass").value;
   if(!email||!pass){toast("Isi email dan password.");return;}
-  const u = db.users().find(x=>x.email.toLowerCase()===email.toLowerCase() && x.password===pass);
-  if(!u){toast("Email atau password salah.");return;}
-  session={userId:u.id};
-  sessionStorage.setItem("hw_session",JSON.stringify(session));
+
+  const {ok, data} = await apiPost("/api/login", {email, password: pass});
+  if(!ok){ toast(data.error || "Email atau password salah."); return; }
+
+  _authUser = data.user;
   document.getElementById("loginEmail").value="";
   document.getElementById("loginPass").value="";
-  if(u.role==="admin"){ toast("Berhasil masuk sebagai Admin."); go("admin-dashboard"); }
-  else { toast("Selamat datang kembali, "+u.name+"!"); go("home"); }
+  if(_authUser.role==="admin"){ toast("Berhasil masuk sebagai Admin."); go("admin-dashboard"); }
+  else { toast("Selamat datang kembali, "+_authUser.full_name+"!"); go("home"); }
 }
 
-function doRegister(){
-  const name=document.getElementById("regName").value.trim();
+async function doRegister(){
+  const full_name=document.getElementById("regName").value.trim();
+  const username=document.getElementById("regUsername").value.trim();
   const email=document.getElementById("regEmail").value.trim();
   const phone=document.getElementById("regPhone").value.trim();
   const address=document.getElementById("regAddress").value.trim();
-  const pass=document.getElementById("regPass").value;
+  const password=document.getElementById("regPass").value;
   const passConfirm=document.getElementById("regPassConfirm").value;
   const termsOk=document.getElementById("regTerms").checked;
-  if(!name||!email||!phone||!address||!pass||!passConfirm){toast("Lengkapi semua data terlebih dahulu.");return;}
-  if(pass.length<8){toast("Kata sandi minimal 8 karakter.");return;}
-  if(pass!==passConfirm){toast("Konfirmasi kata sandi tidak cocok.");return;}
+
+  // Validasi ringan di sisi tampilan dulu (respons cepat, hemat request).
+  // Validasi yang menentukan tetap di backend (lihat app/auth.py) -- jangan
+  // pernah percaya validasi di browser saja, karena bisa dilewati.
+  if(!full_name||!username||!email||!phone||!address||!password||!passConfirm){toast("Lengkapi semua data terlebih dahulu.");return;}
+  if(password.length<8){toast("Kata sandi minimal 8 karakter.");return;}
+  if(password!==passConfirm){toast("Konfirmasi kata sandi tidak cocok.");return;}
   if(!termsOk){toast("Setujui Syarat & Ketentuan dan Kebijakan Privasi terlebih dahulu.");return;}
-  const users=db.users();
-  if(users.find(u=>u.email.toLowerCase()===email.toLowerCase())){toast("Email sudah terdaftar.");return;}
-  const joined=new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"});
-  const newUser={id:Date.now(),name,email,phone,address,password:pass,role:"user",joined};
-  users.push(newUser); db.saveUsers(users);
-  session={userId:newUser.id};
-  sessionStorage.setItem("hw_session",JSON.stringify(session));
+
+  const {ok, data} = await apiPost("/api/register", {full_name, username, email, phone, address, password});
+  if(!ok){ toast(data.error || "Pendaftaran gagal."); return; }
+
+  _authUser = data.user;
   document.getElementById("regPass").value="";
   document.getElementById("regPassConfirm").value="";
-  toast("Akun berhasil dibuat. Selamat datang, "+name+"!");
+  toast("Akun berhasil dibuat. Selamat datang, "+full_name+"!");
   go("home");
 }
 
-function logout(){
-  session=null; sessionStorage.removeItem("hw_session");
+async function logout(){
+  await apiPost("/api/logout");
+  _authUser=null;
   toast("Anda telah keluar.");
   go("home");
 }
@@ -324,7 +351,7 @@ function productCardHTML(p){
       <div class="name">${p.name}</div>
       <div class="price">${fmt(p.price)}</div>
       <div class="rating-line">${st.n ? starsHTML(st.avg)+` <b>${st.avg.toFixed(1)}</b> <span class="muted">(${st.n} ulasan)</span>` : `<span class="muted">Belum ada ulasan</span>`}</div>
-      ${last ? `<div class="review-snippet">“${esc(last.text)}”${(last.images&&last.images.length)?" 📷":""} <span>— ${esc(last.userName)}</span></div>` : ""}
+      ${last ? `<div class="review-snippet">"${esc(last.text)}"${(last.images&&last.images.length)?" 📷":""} <span>— ${esc(last.userName)}</span></div>` : ""}
       <div class="row"><span></span>
         <button class="add-btn" onclick="event.stopPropagation();addToCart(${p.id})">+</button>
       </div>
@@ -643,6 +670,7 @@ function renderProfile(){
       <h3 style="margin-top:0">Informasi Pribadi</h3>
       <div class="two-col">
         <div><div style="font-size:12px;color:var(--muted)">Nama Lengkap</div><div style="font-size:14.5px;font-weight:600">${u.name}</div></div>
+        <div><div style="font-size:12px;color:var(--muted)">Username</div><div style="font-size:14.5px;font-weight:600">${u.username||'-'}</div></div>
         <div><div style="font-size:12px;color:var(--muted)">Email</div><div style="font-size:14.5px;font-weight:600">${u.email}</div></div>
         <div><div style="font-size:12px;color:var(--muted)">No. WhatsApp</div><div style="font-size:14.5px;font-weight:600">${u.phone}</div></div>
         <div><div style="font-size:12px;color:var(--muted)">Alamat</div><div style="font-size:14.5px;font-weight:600">${u.address}</div></div>
@@ -908,12 +936,13 @@ const NAVBAR_HTML = `<nav class="navbar">
     </div>
   </div>
 </nav>`;
-(function boot(){
+(async function boot(){
   const page = document.body.dataset.page;
   document.body.insertAdjacentHTML("afterbegin", NAVBAR_HTML);
   if(page==="katalog"){
     const r=document.querySelector('input[name="fcat"][value="'+currentFilterCat+'"]'); if(r) r.checked=true;
   }
+  await refreshAuth(); // tunggu status login dari server dulu, baru render (halaman butuh tahu siapa yang login)
   showPage(page);
   if(page==="tentang"||page==="kontak") document.getElementById("footer-"+page).innerHTML = footerHTML();
   const pt=sessionStorage.getItem("hw_pendingToast");
