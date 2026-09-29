@@ -50,6 +50,9 @@ def create_app(config_class=Config):
     from .auth import auth_bp
     app.register_blueprint(auth_bp)
 
+    from .catalog import catalog_bp
+    app.register_blueprint(catalog_bp)
+
     # ---- Menyajikan file CSS & JS langsung dari folder css/ dan js/ ----
     @app.route("/css/<path:filename>")
     def css_files(filename):

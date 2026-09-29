@@ -4,19 +4,6 @@ const CATS = [
 ];
 
 function seedIfEmpty(){
-  if(!localStorage.getItem("hw_products")){
-    const products = [
-      {id:1,name:"Sofa Kain Linen Naima 3-Seater",category:"Sofa",material:"Kayu Jati",price:5850000,stock:8,desc:"Sofa 3 dudukan dengan rangka kayu jati solid dan pelapis linen premium yang lembut dan tahan lama.",icon:"🛋️",rating:4.8},
-      {id:2,name:"Meja Makan Kayu Solid Wijaya",category:"Meja",material:"Kayu Mahoni",price:4200000,stock:5,desc:"Meja makan 6 kursi dari kayu mahoni solid dengan finishing natural.",icon:"🍽️",rating:4.7},
-      {id:3,name:"Kursi Santai Rotan Elegan",category:"Kursi",material:"Rotan",price:1850000,stock:12,desc:"Kursi santai anyaman rotan asli, ringan dan nyaman untuk teras.",icon:"💺",rating:4.6},
-      {id:4,name:"Lemari Baju 3 Pintu Klasik",category:"Lemari",material:"Kayu Jati",price:3950000,stock:6,desc:"Lemari pakaian 3 pintu kayu jati dengan cermin dan rak dalam luas.",icon:"🚪",rating:4.9},
-      {id:5,name:"Meja Kerja Solid Aksara",category:"Meja",material:"Kayu Mahoni",price:2450000,stock:9,desc:"Meja kerja minimalis kayu solid, cocok untuk ruang kerja di rumah.",icon:"🖥️",rating:4.5},
-      {id:6,name:"Kursi Makan Kayu Klasik",category:"Kursi",material:"Kayu Jati",price:950000,stock:20,desc:"Kursi makan kayu jati dengan desain klasik dan kokoh.",icon:"🪑",rating:4.4},
-      {id:7,name:"Sofa 2-Seater Tropical Suede",category:"Sofa",material:"Kayu Mahoni",price:4650000,stock:7,desc:"Sofa dua dudukan berbahan suede lembut dengan kaki kayu solid.",icon:"🛋️",rating:4.7},
-      {id:8,name:"Rak Buku Kayu Minimalis",category:"Lemari",material:"Kayu Jati",price:1650000,stock:10,desc:"Rak buku terbuka dari kayu solid, cocok untuk ruang baca maupun kerja.",icon:"📚",rating:4.6}
-    ];
-    localStorage.setItem("hw_products",JSON.stringify(products));
-  }
   if(!localStorage.getItem("hw_users")){
     const users = [
       {id:1,name:"Admin Homey Wood",username:"admin",email:"admin@homeywood.com",phone:"081200000000",address:"Kantor Pusat Homey Wood, Jakarta",password:"admin123",role:"admin",joined:"01 Januari 2026"}
@@ -30,9 +17,36 @@ function seedIfEmpty(){
 }
 seedIfEmpty();
 
+/* ---------- PRODUK (dari backend sekarang, bukan localStorage) ----------
+   PRODUCTS_CACHE nyimpen produk yang terakhir diambil dari server, dipakai
+   sinkron oleh kode lama (cart, review, dst) lewat db.products().
+   Cache-nya keisi tiap kali fetchProductList()/fetchProductDetail() dipanggil
+   -- jadi urutan wajar: buka katalog/home/detail dulu, baru bisa add to cart. */
+let PRODUCTS_CACHE = {};
+
+async function fetchProductList(params){
+  const qs = new URLSearchParams();
+  if(params && params.category && params.category!=="Semua") qs.set("category", params.category);
+  if(params && params.materials) params.materials.forEach(m=>qs.append("material", m));
+  if(params && params.search) qs.set("search", params.search);
+  const res = await fetch("/api/products?"+qs.toString());
+  const data = await res.json();
+  const list = data.products || [];
+  list.forEach(p=>{ PRODUCTS_CACHE[p.id]=p; });
+  return list;
+}
+
+async function fetchProductDetail(id){
+  const res = await fetch("/api/products/"+id);
+  if(!res.ok) return null;
+  const data = await res.json();
+  PRODUCTS_CACHE[data.product.id]=data.product;
+  return data.product;
+}
+
 const db = {
-  products:()=>JSON.parse(localStorage.getItem("hw_products")),
-  saveProducts:(p)=>localStorage.setItem("hw_products",JSON.stringify(p)),
+  products:()=>Object.values(PRODUCTS_CACHE),
+  saveProducts:(p)=>{ /* TODO: belum ada API simpan produk (admin kelola produk) -- ini giliran berikutnya */ },
   users:()=>JSON.parse(localStorage.getItem("hw_users")),
   saveUsers:(u)=>localStorage.setItem("hw_users",JSON.stringify(u)),
   orders:()=>JSON.parse(localStorage.getItem("hw_orders")),
@@ -359,25 +373,24 @@ function productCardHTML(p){
   </div>`;
 }
 
-function renderHome(){
+async function renderHome(){
   document.getElementById("catRow").innerHTML = CATS.map(c=>`
     <div class="cat-item" onclick="goToKatalogCat('${c.key}')">
       <div class="cat-circle">${c.icon}</div><span>${c.key}</span>
     </div>`).join("");
-  const top = db.products().slice(0,4);
+  const all = await fetchProductList();
+  const top = all.slice(0,4);
   document.getElementById("homeProducts").innerHTML = top.map(productCardHTML).join("");
   document.getElementById("footer-home").innerHTML = footerHTML();
 }
 function goToKatalogCat(cat){ currentFilterCat=cat; sessionStorage.setItem("hw_filterCat",JSON.stringify(cat)); go("katalog"); }
 
 /* ---------- KATALOG ---------- */
-function renderKatalog(){
+async function renderKatalog(){
   const checked = document.querySelector('input[name="fcat"]:checked');
   const cat = checked ? checked.value : currentFilterCat;
   const mats = Array.from(document.querySelectorAll('.fmat:checked')).map(m=>m.value);
-  let list = db.products();
-  if(cat && cat!=="Semua") list = list.filter(p=>p.category===cat);
-  if(mats.length>0) list = list.filter(p=>mats.includes(p.material));
+  const list = await fetchProductList({category: cat, materials: mats});
   document.getElementById("katalogGrid").innerHTML = list.length ? list.map(productCardHTML).join("") :
     `<div class="empty-state" style="grid-column:1/-1"><div>🔍</div>Tidak ada produk yang cocok dengan filter ini.</div>`;
   document.getElementById("footer-katalog").innerHTML = footerHTML();
@@ -386,8 +399,8 @@ function renderKatalog(){
 /* ---------- DETAIL ---------- */
 let detailQty=1;
 function openDetail(id){ currentDetailId=id; sessionStorage.setItem("hw_detailId",JSON.stringify(id)); detailQty=1; go("detail"); }
-function renderDetail(){
-  const p = db.products().find(x=>x.id===currentDetailId);
+async function renderDetail(){
+  const p = await fetchProductDetail(currentDetailId);
   if(!p){ document.getElementById("detailWrap").innerHTML="<p>Produk tidak ditemukan.</p>"; return; }
   const st=ratingStats(p.id);
   document.getElementById("detailWrap").innerHTML = `
@@ -449,8 +462,9 @@ function cartWithDetails(){
 }
 function cartTotal(){ return cartWithDetails().reduce((s,i)=>s+i.product.price*i.qty,0); }
 
-function renderCart(){
+async function renderCart(){
   if(!requireLogin()) return;
+  await fetchProductList(); // isi cache dulu -- halaman ini bisa dibuka langsung tanpa lewat katalog
   const items = cartWithDetails();
   if(items.length===0){
     document.getElementById("cartLayout").innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div>🛒</div>Keranjang Anda masih kosong.<br><br><button class="btn btn-primary" onclick="go('katalog')">Mulai Belanja</button></div>`;
@@ -584,8 +598,9 @@ function renderQrisBox(){
       <div style="font-size:12.5px;color:var(--muted);margin-top:10px">Kode QRIS dinamis akan otomatis kedaluwarsa dalam <b id="qrisTimer">10:00</b></div>
     </div>`;
 }
-function renderCheckout(){
+async function renderCheckout(){
   if(!requireLogin()) return;
+  await fetchProductList();
   const items=cartWithDetails();
   const u=currentUser();
   const ship=calcShipping(items);
@@ -739,12 +754,13 @@ function showAddProductForm(){ document.getElementById("addProductForm").style.d
 function hideAddProductForm(){ document.getElementById("addProductForm").style.display="none"; }
 function clearProductForm(){ apName.value=""; apPrice.value=""; apStock.value=""; apDesc.value=""; apCat.value="Sofa"; }
 let editingProductId=null;
-function renderAdminKatalog(){
+async function renderAdminKatalog(){
   const u=currentUser();
   if(!u||u.role!=="admin"){ toast("Halaman khusus admin."); go("login"); return; }
   document.getElementById("adminSidebar2").innerHTML = adminSidebarHTML("admin-katalog");
   document.getElementById("adminHeader2").innerHTML = adminHeaderHTML("Kelola Katalog Produk","Portal Pemantauan dan Operasional Furniture Homey Wood");
   document.getElementById("footer-admin-katalog").innerHTML = adminFooterHTML();
+  await fetchProductList(); // baca-baca aja untuk sekarang; tambah/edit/hapus belum tersambung backend
   const tbody=document.querySelector("#adminProductTable tbody");
   tbody.innerHTML = db.products().map(p=>`
     <tr>
@@ -933,9 +949,29 @@ const NAVBAR_HTML = `<nav class="navbar">
         <div class="icon-btn" onclick="onProfileIconClick()">👤</div>
         <div class="dropdown-menu" id="dropdownMenu"></div>
       </div>
+      <button class="icon-btn menu-btn" id="menuBtn" onclick="toggleMenu()" aria-label="Menu" aria-expanded="false"><span class="bars"><i></i><i></i><i></i></span></button>
     </div>
   </div>
-</nav>`;
+</nav>
+<div class="mobile-menu" id="mobileMenu">
+  <a onclick="go('home')" data-nav="home">Beranda</a>
+  <a onclick="go('katalog')" data-nav="katalog">Katalog</a>
+  <a onclick="go('tentang')" data-nav="tentang">Tentang Kami</a>
+  <a onclick="go('kontak')" data-nav="kontak">Kontak</a>
+</div>`;
+
+function toggleMenu(force){
+  const m=document.getElementById("mobileMenu"), b=document.getElementById("menuBtn");
+  if(!m||!b) return;
+  const open = typeof force==="boolean" ? force : !m.classList.contains("open");
+  m.classList.toggle("open",open);
+  b.classList.toggle("open",open);
+  b.setAttribute("aria-expanded",open);
+  document.body.classList.toggle("menu-open",open);
+}
+window.addEventListener("resize",()=>{ if(window.innerWidth>900) toggleMenu(false); });
+document.addEventListener("keydown",e=>{ if(e.key==="Escape") toggleMenu(false); });
+
 (async function boot(){
   const page = document.body.dataset.page;
   document.body.insertAdjacentHTML("afterbegin", NAVBAR_HTML);

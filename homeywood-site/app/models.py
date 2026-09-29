@@ -60,7 +60,9 @@ class Product(db.Model):
     description = db.Column(db.Text)
     price = db.Column(db.Numeric(12, 2), nullable=False)
     stock = db.Column(db.Integer, nullable=False, default=0)
+    material = db.Column(db.String(50))
     image_path = db.Column(db.String(255))
+    icon_emoji = db.Column(db.String(10))  # sementara, sampai upload gambar produk beneran ada
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
