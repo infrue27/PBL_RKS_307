@@ -107,6 +107,7 @@ class Order(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     total_amount = db.Column(db.Numeric(14, 2), nullable=False)
     shipping_address = db.Column(db.Text, nullable=False)
+    payment_label = db.Column(db.String(100))  # contoh: "Transfer Bank BCA (VA: 39017...)"
     status = db.Column(db.Enum(*ORDER_STATUSES), nullable=False, default="menunggu_pembayaran")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())

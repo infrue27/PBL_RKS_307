@@ -15,7 +15,7 @@ def user_to_dict(user):
     return {
         "id": user.id,
         "full_name": user.full_name,
-        "name": user.full_name,  # alias, dipakai app.js lama (u.name) di navbar/profil/checkout
+        "name": user.full_name,
         "username": user.username,
         "email": user.email,
         "phone": user.phone,

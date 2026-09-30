@@ -1,6 +1,7 @@
 import os
 
 from flask import Flask, abort, redirect, send_from_directory
+from flask_login import login_required
 from sqlalchemy import text
 
 from config import Config
@@ -52,6 +53,21 @@ def create_app(config_class=Config):
 
     from .catalog import catalog_bp
     app.register_blueprint(catalog_bp)
+
+    from .orders import orders_bp
+    app.register_blueprint(orders_bp)
+
+    # ---- Folder upload (bukti bayar, nanti avatar juga) ----
+    app.config["UPLOAD_ROOT"] = os.path.join(BASE_DIR, app.config.get("UPLOAD_FOLDER", "uploads"))
+    os.makedirs(app.config["UPLOAD_ROOT"], exist_ok=True)
+
+    @app.route("/uploads/<path:filename>")
+    @login_required
+    def uploaded_file(filename):
+        # TODO (keamanan, giliran berikutnya): saat ini siapa saja yang login bisa
+        # lihat file siapa saja kalau tahu nama filenya. Idealnya dibatasi hanya
+        # pemilik order tersebut atau admin.
+        return send_from_directory(app.config["UPLOAD_ROOT"], filename)
 
     # ---- Menyajikan file CSS & JS langsung dari folder css/ dan js/ ----
     @app.route("/css/<path:filename>")

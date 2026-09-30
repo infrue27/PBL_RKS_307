@@ -186,16 +186,18 @@ function adminHeaderHTML(title,subtitle){
 }
 
 /* ---------- AUTH ---------- */
-async function apiPost(url, body){
-  const res = await fetch(url, {
-    method: "POST",
-    headers: {"Content-Type": "application/json"},
-    body: JSON.stringify(body || {})
-  });
+async function apiRequest(method, url, body){
+  const opts = { method, headers: {} };
+  if(body !== undefined){
+    opts.headers["Content-Type"] = "application/json";
+    opts.body = JSON.stringify(body);
+  }
+  const res = await fetch(url, opts);
   let data = {};
   try{ data = await res.json(); }catch(e){ /* respons kosong, misal 204 */ }
   return {ok: res.ok, status: res.status, data};
 }
+function apiPost(url, body){ return apiRequest("POST", url, body || {}); }
 
 async function doLogin(){
   const email = document.getElementById("loginEmail").value.trim();
@@ -337,9 +339,9 @@ function submitReview(){
   try{ db.saveReviews(rs); }catch(e){ rs.pop(); toast("Penyimpanan penuh, kurangi jumlah foto."); return; }
   closeReviewModal(); toast("Terima kasih, ulasan terkirim!"); renderProfile();
 }
-function confirmArrived(id){
-  const os=db.orders(); const o=os.find(x=>x.id===id); if(!o) return;
-  o.status="Selesai"; o.arrived=todayStr(); db.saveOrders(os);
+async function confirmArrived(id){
+  const {ok, data} = await apiRequest("POST", `/api/orders/${id}/confirm-arrived`);
+  if(!ok){ toast(data.error || "Gagal mengonfirmasi pesanan."); return; }
   toast("Pesanan diterima. Silakan beri rating & ulasan!"); renderProfile();
 }
 function orderActionsHTML(o){
@@ -634,8 +636,7 @@ async function renderCheckout(){
   document.getElementById("footer-checkout").innerHTML = footerHTML();
   if(selectedPayment==="QRIS" && !qrisInterval) startQrisTimer();
 }
-function placeOrder(){
-  const u=currentUser();
+async function placeOrder(){
   const items=cartWithDetails();
   const isCOD=selectedPayment==="Bayar di Tempat (COD)";
   if(!isCOD && !paymentProof){
@@ -643,35 +644,31 @@ function placeOrder(){
     const pb=document.querySelector(".proof-box"); if(pb){ pb.classList.add("shake"); pb.scrollIntoView({behavior:"smooth",block:"center"}); setTimeout(()=>pb.classList.remove("shake"),600); }
     return;
   }
-  const ship=calcShipping(items);
   let paymentLabel=selectedPayment;
   if(selectedPayment==="Transfer Bank") paymentLabel="Transfer Bank "+BANKS.find(b=>b.code===selectedBank).name+" (VA: "+getVA(selectedBank)+")";
-  const order={
-    id:"HW"+Date.now().toString().slice(-8),
-    userId:u.id,
-    items:items.map(i=>({productId:i.productId,name:i.product.name,qty:i.qty,price:i.product.price})),
-    subtotal:cartTotal(),
-    shipping:ship.fee,
-    zone:ship.zone.name,
-    total:cartTotal()+ship.fee,
-    payment:paymentLabel,
-    proof:isCOD?null:paymentProof,
-    status:isCOD?"Diproses":"Menunggu Verifikasi",
-    date:todayStr()
+
+  const payload = {
+    items: items.map(i=>({productId:i.productId, qty:i.qty})), // harga/nama TIDAK dikirim -- server yang tentukan dari database
+    zone: selectedZone,
+    payment_method: selectedPayment,
+    payment_label: paymentLabel,
+    payment_proof: isCOD ? null : paymentProof,
   };
-  try{
-    const orders=db.orders(); orders.push(order); db.saveOrders(orders);
-  }catch(e){ toast("Gagal menyimpan pesanan (penyimpanan penuh). Coba bukti dengan ukuran lebih kecil."); return; }
+  const {ok, data} = await apiRequest("POST", "/api/orders", payload);
+  if(!ok){ toast(data.error || "Gagal membuat pesanan."); return; }
+
   setCart([]); updateCartBadge(); stopQrisTimer(); vaCache={}; paymentProof=null;
   toast(isCOD ? "Pesanan dibuat! Bayar tunai saat barang tiba." : "Pesanan dibuat! Menunggu verifikasi pembayaran.");
   go("profile");
 }
 
 /* ---------- PROFILE ---------- */
-function renderProfile(){
+async function renderProfile(){
   if(!requireLogin()) return;
   const u=currentUser();
-  const myOrders=db.orders().filter(o=>o.userId===u.id).reverse();
+  const orderRes = await fetch("/api/orders");
+  const orderData = await orderRes.json();
+  const myOrders = orderRes.ok ? (orderData.orders || []) : [];
   const initials=u.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase();
   document.getElementById("profileContent").innerHTML = `
     <div class="profile-head">
@@ -754,15 +751,16 @@ function showAddProductForm(){ document.getElementById("addProductForm").style.d
 function hideAddProductForm(){ document.getElementById("addProductForm").style.display="none"; }
 function clearProductForm(){ apName.value=""; apPrice.value=""; apStock.value=""; apDesc.value=""; apCat.value="Sofa"; }
 let editingProductId=null;
+let adminProductsList=[]; // list terakhir dari server, dipakai editProduct/deleteProduct di bawah
 async function renderAdminKatalog(){
   const u=currentUser();
   if(!u||u.role!=="admin"){ toast("Halaman khusus admin."); go("login"); return; }
   document.getElementById("adminSidebar2").innerHTML = adminSidebarHTML("admin-katalog");
   document.getElementById("adminHeader2").innerHTML = adminHeaderHTML("Kelola Katalog Produk","Portal Pemantauan dan Operasional Furniture Homey Wood");
   document.getElementById("footer-admin-katalog").innerHTML = adminFooterHTML();
-  await fetchProductList(); // baca-baca aja untuk sekarang; tambah/edit/hapus belum tersambung backend
+  adminProductsList = await fetchProductList(); // list asli dari server, bukan db.products() -- itu cache lama yang bisa nyangkut data terhapus
   const tbody=document.querySelector("#adminProductTable tbody");
-  tbody.innerHTML = db.products().map(p=>`
+  tbody.innerHTML = adminProductsList.map(p=>`
     <tr>
       <td><div class="mini">${p.icon}</div></td>
       <td>${p.name}</td>
@@ -776,31 +774,31 @@ async function renderAdminKatalog(){
     </tr>`).join("");
 }
 function editProduct(id){
-  const p=db.products().find(x=>x.id===id);
+  const p=adminProductsList.find(x=>x.id===id);
+  if(!p) return;
   editingProductId=id;
   document.getElementById("addProductForm").style.display="block";
   apName.value=p.name; apCat.value=p.category; apPrice.value=p.price; apStock.value=p.stock; apDesc.value=p.desc;
   window.scrollTo(0,0);
 }
-function saveProduct(){
+async function saveProduct(){
   const name=apName.value.trim(), cat=apCat.value, price=Number(apPrice.value), stock=Number(apStock.value), desc=apDesc.value.trim();
   if(!name||!price||!stock){ toast("Lengkapi data produk."); return; }
-  const products=db.products();
-  if(editingProductId){
-    const p=products.find(x=>x.id===editingProductId);
-    Object.assign(p,{name,category:cat,price,stock,desc});
-    toast("Produk berhasil diperbarui.");
-  } else {
-    products.push({id:Date.now(),name,category:cat,price,stock,desc,icon:"🪵",rating:4.5});
-    toast("Produk baru berhasil ditambahkan.");
-  }
-  db.saveProducts(products);
+  const payload={name, category:cat, price, stock, desc};
+
+  const {ok, data} = editingProductId
+    ? await apiRequest("PUT", `/api/admin/products/${editingProductId}`, payload)
+    : await apiRequest("POST", "/api/admin/products", payload);
+
+  if(!ok){ toast(data.error || "Gagal menyimpan produk."); return; }
+  toast(editingProductId ? "Produk berhasil diperbarui." : "Produk baru berhasil ditambahkan.");
   hideAddProductForm();
   renderAdminKatalog();
 }
-function deleteProduct(id){
+async function deleteProduct(id){
   if(!confirm("Hapus produk ini?")) return;
-  db.saveProducts(db.products().filter(p=>p.id!==id));
+  const {ok, data} = await apiRequest("DELETE", `/api/admin/products/${id}`);
+  if(!ok){ toast(data.error || "Gagal menghapus produk."); return; }
   toast("Produk dihapus.");
   renderAdminKatalog();
 }
@@ -832,43 +830,46 @@ function deleteUser(id){
 }
 
 /* ---------- ADMIN: VERIFIKASI ---------- */
-function renderAdminVerifikasi(){
+let adminOrdersList=[]; // list terakhir dari server, dipakai verifyOrder/shipOrder/viewProof di bawah
+async function renderAdminVerifikasi(){
   const u=currentUser();
   if(!u||u.role!=="admin"){ toast("Halaman khusus admin."); go("login"); return; }
   document.getElementById("adminSidebar3").innerHTML = adminSidebarHTML("admin-verifikasi");
   document.getElementById("adminHeader3").innerHTML = adminHeaderHTML("Verifikasi & Pengiriman Pesanan","Cek bukti pembayaran, lalu proses pengiriman pesanan");
   document.getElementById("footer-admin-verifikasi").innerHTML = adminFooterHTML();
-  const all=db.orders().slice().reverse();
+  const res = await fetch("/api/admin/orders");
+  const data = await res.json();
+  adminOrdersList = res.ok ? (data.orders || []) : [];
+  const all=adminOrdersList;
   const row=(o,actions)=>{
-    const buyer=db.users().find(x=>x.id===o.userId);
     return `<div class="order-row">
       <div>
-        <div style="font-weight:600">${o.id} · ${buyer?esc(buyer.name):'-'}</div>
-        <div style="font-size:12.5px;color:var(--muted)">${o.items.map(i=>esc(i.name)+" x"+i.qty).join(", ")} · ${esc(o.payment)}${o.zone?" · Tujuan: "+esc(o.zone):""}</div>
-        ${o.proof?`<img class="proof-thumb" src="${o.proof}" onclick="viewProof('${o.id}')" title="Klik untuk memperbesar">`:`<div style="font-size:12px;color:var(--muted);margin-top:6px">${/COD/.test(o.payment)?"COD · tanpa bukti":"Bukti tidak tersedia"}</div>`}
+        <div style="font-weight:600">${o.id} · ${o.buyer?esc(o.buyer.name):'-'}</div>
+        <div style="font-size:12.5px;color:var(--muted)">${o.items.map(i=>esc(i.name)+" x"+i.qty).join(", ")} · ${esc(o.payment||'')}</div>
+        ${o.proof?`<img class="proof-thumb" src="${o.proof}" onclick="viewProof('${o.id}')" title="Klik untuk memperbesar">`:`<div style="font-size:12px;color:var(--muted);margin-top:6px">${/COD/.test(o.payment||"")?"COD · tanpa bukti":"Bukti tidak tersedia"}</div>`}
       </div>
       <div style="text-align:right"><div style="font-weight:700;margin-bottom:8px">${fmt(o.total)}</div>${actions}</div>
     </div>`;
   };
   const sec=(t,list,fn,empty)=>`<h3 style="margin:22px 0 10px">${t} (${list.length})</h3>`+(list.length?list.map(fn).join(""):`<div class="empty-state" style="padding:18px">${empty}</div>`);
   document.getElementById("verifList").innerHTML =
-    sec("Menunggu Verifikasi Pembayaran",all.filter(o=>o.status==="Menunggu Verifikasi"),o=>row(o,`<button class="btn btn-primary btn-sm" onclick="verifyOrder('${o.id}','Diproses')">Setujui</button> <button class="btn btn-danger btn-sm" onclick="verifyOrder('${o.id}','Ditolak')">Tolak</button>`),"Tidak ada pembayaran yang perlu diverifikasi.")+
+    sec("Menunggu Verifikasi Pembayaran",all.filter(o=>o.status==="Menunggu Verifikasi"),o=>row(o,`<button class="btn btn-primary btn-sm" onclick="verifyOrder('${o.id}','approve')">Setujui</button> <button class="btn btn-danger btn-sm" onclick="verifyOrder('${o.id}','reject')">Tolak</button>`),"Tidak ada pembayaran yang perlu diverifikasi.")+
     sec("Diproses (siap dikirim)",all.filter(o=>o.status==="Diproses"),o=>row(o,`<button class="btn btn-primary btn-sm" onclick="shipOrder('${o.id}')">Tandai Dikirim</button>`),"Tidak ada pesanan yang menunggu dikirim.")+
     sec("Dalam Pengiriman",all.filter(o=>o.status==="Dikirim"),o=>row(o,`<span style="font-size:12px;color:var(--muted)">Menunggu konfirmasi pembeli</span>`),"Tidak ada pesanan dalam pengiriman.");
 }
-function verifyOrder(id,status){
-  const orders=db.orders(); const o=orders.find(x=>x.id===id);
-  o.status=status; db.saveOrders(orders);
-  toast("Pesanan "+id+(status==="Ditolak"?" ditolak.":" disetujui & diproses."));
+async function verifyOrder(id,action){
+  const {ok, data} = await apiRequest("POST", `/api/admin/orders/${id}/verify`, {action});
+  if(!ok){ toast(data.error || "Gagal memproses verifikasi."); return; }
+  toast("Pesanan "+id+(action==="reject"?" ditolak.":" disetujui & diproses."));
   renderAdminVerifikasi();
 }
-function shipOrder(id){
-  const orders=db.orders(); const o=orders.find(x=>x.id===id);
-  o.status="Dikirim"; db.saveOrders(orders);
+async function shipOrder(id){
+  const {ok, data} = await apiRequest("POST", `/api/admin/orders/${id}/ship`);
+  if(!ok){ toast(data.error || "Gagal menandai pesanan."); return; }
   toast("Pesanan "+id+" ditandai dikirim."); renderAdminVerifikasi();
 }
 function viewProof(id){
-  const o=db.orders().find(x=>x.id===id); if(!o||!o.proof) return;
+  const o=adminOrdersList.find(x=>x.id===id); if(!o||!o.proof) return;
   const m=document.createElement("div"); m.className="modal-back";
   m.innerHTML=`<div class="modal" style="max-width:520px;text-align:center"><img src="${o.proof}" style="max-width:100%;max-height:70vh;border-radius:8px"><div style="margin-top:12px"><button class="btn btn-outline btn-sm" onclick="this.closest('.modal-back').remove()">Tutup</button></div></div>`;
   m.addEventListener("click",e=>{ if(e.target===m) m.remove(); });
@@ -949,28 +950,9 @@ const NAVBAR_HTML = `<nav class="navbar">
         <div class="icon-btn" onclick="onProfileIconClick()">👤</div>
         <div class="dropdown-menu" id="dropdownMenu"></div>
       </div>
-      <button class="icon-btn menu-btn" id="menuBtn" onclick="toggleMenu()" aria-label="Menu" aria-expanded="false"><span class="bars"><i></i><i></i><i></i></span></button>
     </div>
   </div>
-</nav>
-<div class="mobile-menu" id="mobileMenu">
-  <a onclick="go('home')" data-nav="home">Beranda</a>
-  <a onclick="go('katalog')" data-nav="katalog">Katalog</a>
-  <a onclick="go('tentang')" data-nav="tentang">Tentang Kami</a>
-  <a onclick="go('kontak')" data-nav="kontak">Kontak</a>
-</div>`;
-
-function toggleMenu(force){
-  const m=document.getElementById("mobileMenu"), b=document.getElementById("menuBtn");
-  if(!m||!b) return;
-  const open = typeof force==="boolean" ? force : !m.classList.contains("open");
-  m.classList.toggle("open",open);
-  b.classList.toggle("open",open);
-  b.setAttribute("aria-expanded",open);
-  document.body.classList.toggle("menu-open",open);
-}
-window.addEventListener("resize",()=>{ if(window.innerWidth>900) toggleMenu(false); });
-document.addEventListener("keydown",e=>{ if(e.key==="Escape") toggleMenu(false); });
+</nav>`;
 (async function boot(){
   const page = document.body.dataset.page;
   document.body.insertAdjacentHTML("afterbegin", NAVBAR_HTML);
