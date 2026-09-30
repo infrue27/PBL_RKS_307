@@ -804,29 +804,52 @@ async function deleteProduct(id){
 }
 
 /* ---------- ADMIN: KELOLA USER ---------- */
-function renderAdminUser(){
+let userSearchTimer=null;
+function onUserSearchInput(){
+  clearTimeout(userSearchTimer);
+  userSearchTimer=setTimeout(loadAdminUsers,300); // tunggu user selesai mengetik
+}
+async function renderAdminUser(){
   const u=currentUser();
   if(!u||u.role!=="admin"){ toast("Halaman khusus admin."); go("login"); return; }
   document.getElementById("adminSidebar4").innerHTML = adminSidebarHTML("admin-user");
   document.getElementById("adminHeader4").innerHTML = adminHeaderHTML("Kelola User","Data pengguna terdaftar di platform Homey Wood");
   document.getElementById("footer-admin-user").innerHTML = adminFooterHTML();
+  loadAdminUsers();
+}
+async function loadAdminUsers(){
   const tbody=document.querySelector("#adminUserTable tbody");
-  const users=db.users().filter(x=>x.role==="user");
+  const search=document.getElementById("userSearch").value.trim();
+  const status=document.getElementById("userStatus").value;
+  const qs=new URLSearchParams();
+  if(search) qs.set("search",search);
+  if(status!=="all") qs.set("status",status);
+  const res=await fetch("/api/admin/users?"+qs.toString());
+  if(!res.ok){
+    tbody.innerHTML=`<tr><td colspan="8" style="text-align:center;color:var(--muted)">Gagal memuat data pengguna.</td></tr>`;
+    return;
+  }
+  const users=(await res.json()).users||[];
   tbody.innerHTML = users.length ? users.map(x=>`
     <tr>
-      <td>${x.name}</td>
-      <td>${x.email}</td>
-      <td>${x.phone}</td>
-      <td>${x.address}</td>
-      <td>${x.joined||'-'}</td>
-      <td><button class="btn btn-danger btn-sm" onclick="deleteUser(${x.id})">Hapus</button></td>
-    </tr>`).join("") : `<tr><td colspan="6" style="text-align:center;color:var(--muted)">Belum ada pengguna terdaftar.</td></tr>`;
+      <td>${esc(x.name)}<div class="muted" style="font-size:12px">@${esc(x.username)}</div></td>
+      <td>${esc(x.email)}</td>
+      <td>${esc(x.phone)}</td>
+      <td>${esc(x.address)}</td>
+      <td>${esc(x.joined)||'-'}</td>
+      <td>${x.order_count}</td>
+      <td><span class="status-pill ${x.is_active?'status-done':'status-rejected'}">${x.is_active?'Aktif':'Nonaktif'}</span></td>
+      <td>${x.is_active
+        ? `<button class="btn btn-danger btn-sm" onclick="toggleUserActive(${x.id},false)">Nonaktifkan</button>`
+        : `<button class="btn btn-primary btn-sm" onclick="toggleUserActive(${x.id},true)">Aktifkan</button>`}</td>
+    </tr>`).join("") : `<tr><td colspan="8" style="text-align:center;color:var(--muted)">Tidak ada pengguna yang cocok.</td></tr>`;
 }
-function deleteUser(id){
-  if(!confirm("Hapus pengguna ini?")) return;
-  db.saveUsers(db.users().filter(x=>x.id!==id));
-  toast("Pengguna dihapus.");
-  renderAdminUser();
+async function toggleUserActive(id,makeActive){
+  if(!makeActive && !confirm("Nonaktifkan akun ini? User tidak akan bisa login sampai diaktifkan lagi.")) return;
+  const {ok,data}=await apiRequest("PATCH",`/api/admin/users/${id}/status`,{is_active:makeActive});
+  if(!ok){ toast(data.error||"Gagal mengubah status akun."); return; }
+  toast(makeActive?"Akun diaktifkan.":"Akun dinonaktifkan.");
+  loadAdminUsers();
 }
 
 /* ---------- ADMIN: VERIFIKASI ---------- */

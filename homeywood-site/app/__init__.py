@@ -35,7 +35,10 @@ def create_app(config_class=Config):
 
     @login_manager.user_loader
     def load_user(user_id):
-        return db.session.get(User, int(user_id))
+        user = db.session.get(User, int(user_id))
+        if user and not user.is_active:
+            return None
+        return user
 
     @login_manager.unauthorized_handler
     def unauthorized():
@@ -56,6 +59,9 @@ def create_app(config_class=Config):
 
     from .orders import orders_bp
     app.register_blueprint(orders_bp)
+
+    from .admin_users import admin_users_bp
+    app.register_blueprint(admin_users_bp)
 
     # ---- Folder upload (bukti bayar, nanti avatar juga) ----
     app.config["UPLOAD_ROOT"] = os.path.join(BASE_DIR, app.config.get("UPLOAD_FOLDER", "uploads"))

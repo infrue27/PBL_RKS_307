@@ -16,7 +16,16 @@
     <div class="admin-content">
       <div class="admin-header" id="adminHeader4"></div>
       <main class="admin-main">
-        <div class="table-wrap"><table id="adminUserTable"><thead><tr><th>Nama</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Tanggal Daftar</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <input id="userSearch" placeholder="Cari nama, email, atau username..." oninput="onUserSearchInput()"
+           style="flex:1;min-width:220px;padding:10px 12px;border:1px solid #D9CDB8;border-radius:8px;font:inherit">
+          <select id="userStatus" class="zone-select" onchange="loadAdminUsers()" style="max-width:180px">
+            <option value="all">Semua status</option>
+            <option value="active">Aktif</option>
+            <option value="inactive">Nonaktif</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="adminUserTable"><thead><tr><th>Nama</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Tanggal Daftar</th><th>Order</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
       </main>
       <div id="footer-admin-user"></div>
     </div>
