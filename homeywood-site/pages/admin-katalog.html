@@ -29,6 +29,13 @@
             <div class="form-row"><label>Stok</label><input id="apStock" type="number"></div>
           </div>
           <div class="form-row"><label>Deskripsi</label><textarea id="apDesc" rows="2"></textarea></div>
+          <div class="form-row"><label>Foto Produk (JPG/PNG/WEBP, maks 2 MB)</label>
+            <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+              <div id="apImagePreview" class="img-preview"></div>
+              <input id="apImage" type="file" accept="image/jpeg,image/png,image/webp" onchange="onProductImagePick(this)">
+              <button type="button" id="apImageRemove" class="btn btn-outline btn-sm" style="display:none" onclick="clearProductImage()">Hapus Foto</button>
+            </div>
+          </div>
           <button class="btn btn-primary btn-sm" onclick="saveProduct()">Simpan Produk</button>
           <button class="btn btn-outline btn-sm" onclick="hideAddProductForm()">Batal</button>
         </div>
