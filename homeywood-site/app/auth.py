@@ -5,6 +5,7 @@ from flask_login import current_user, login_required, login_user, logout_user
 
 from .extensions import db
 from .models import User
+from .uploads import upload_url
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api")
 
@@ -22,6 +23,7 @@ def user_to_dict(user):
         "address": user.address,
         "role": user.role,
         "avatar_path": user.avatar_path,
+        "avatar_url": upload_url(user.avatar_path),
     }
 
 

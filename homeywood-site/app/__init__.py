@@ -1,7 +1,7 @@
 import os
 
 from flask import Flask, abort, redirect, send_from_directory
-from flask_login import login_required
+from flask_login import current_user
 from sqlalchemy import text
 
 from config import Config
@@ -63,16 +63,46 @@ def create_app(config_class=Config):
     from .admin_users import admin_users_bp
     app.register_blueprint(admin_users_bp)
 
+    from .profile import profile_bp
+    app.register_blueprint(profile_bp)
+
+    from .admin_dashboard import admin_dashboard_bp
+    app.register_blueprint(admin_dashboard_bp)
+
+    from .cart import cart_bp
+    app.register_blueprint(cart_bp)
+
     # ---- Folder upload (bukti bayar, nanti avatar juga) ----
     app.config["UPLOAD_ROOT"] = os.path.join(BASE_DIR, app.config.get("UPLOAD_FOLDER", "uploads"))
     os.makedirs(app.config["UPLOAD_ROOT"], exist_ok=True)
 
     @app.route("/uploads/<path:filename>")
-    @login_required
     def uploaded_file(filename):
-        # TODO (keamanan, giliran berikutnya): saat ini siapa saja yang login bisa
-        # lihat file siapa saja kalau tahu nama filenya. Idealnya dibatasi hanya
-        # pemilik order tersebut atau admin.
+        parts = filename.split("/")
+        if ".." in parts or len(parts) < 2:
+            abort(404)
+        folder = parts[0]
+
+        if folder == "products":
+            pass  # foto produk publik: tamu yang belum login juga melihat katalog
+        elif not current_user.is_authenticated:
+            return login_manager.unauthorized()
+        elif folder == "avatars":
+            pass  # foto profil: cukup login
+        elif folder == "payment_proofs":
+            # bukti bayar: hanya admin dan pemilik order
+            if not current_user.is_admin:
+                from .models import Order, Payment
+                owner = (
+                    db.session.query(Payment.id)
+                    .join(Order, Payment.order_id == Order.id)
+                    .filter(Payment.proof_path == filename, Order.user_id == current_user.id)
+                    .first()
+                )
+                if not owner:
+                    abort(403)
+        else:
+            abort(404)
         return send_from_directory(app.config["UPLOAD_ROOT"], filename)
 
     # ---- Menyajikan file CSS & JS langsung dari folder css/ dan js/ ----

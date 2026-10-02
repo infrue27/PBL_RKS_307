@@ -10,7 +10,7 @@ from flask_login import current_user, login_required
 
 from .catalog import admin_required
 from .extensions import db
-from .models import Order, OrderItem, Payment, Product
+from .models import CartItem, Order, OrderItem, Payment, Product
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/api")
 
@@ -191,9 +191,9 @@ def create_order():
             return jsonify({"error": "Format bukti pembayaran tidak valid."}), 400
         db.session.add(Payment(order_id=order.id, proof_path=proof_path, status="pending"))
 
+    CartItem.query.filter_by(user_id=current_user.id).delete()  # kosongkan keranjang, satu transaksi dengan pesanan
     db.session.commit()
     return jsonify({"order": order_to_dict(order)}), 201
-
 
 # ============ Khusus admin: lihat semua order, verifikasi bayar, kirim ============
 

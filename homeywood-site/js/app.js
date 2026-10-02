@@ -17,11 +17,6 @@ function seedIfEmpty(){
 }
 seedIfEmpty();
 
-/* ---------- PRODUK (dari backend sekarang, bukan localStorage) ----------
-   PRODUCTS_CACHE nyimpen produk yang terakhir diambil dari server, dipakai
-   sinkron oleh kode lama (cart, review, dst) lewat db.products().
-   Cache-nya keisi tiap kali fetchProductList()/fetchProductDetail() dipanggil
-   -- jadi urutan wajar: buka katalog/home/detail dulu, baru bisa add to cart. */
 let PRODUCTS_CACHE = {};
 
 async function fetchProductList(params){
@@ -441,23 +436,23 @@ function changeQty(d){
 }
 
 /* ---------- CART ---------- */
-function getCart(){
-  if(!currentUser()) return [];
-  const carts=db.carts();
-  return carts[currentUser().id] || [];
+let _cart = []; // cache keranjang dari server, diisi refreshCart() saat halaman dibuka
+
+async function refreshCart(){
+  if(!currentUser()){ _cart=[]; return; }
+  try{
+    const res = await fetch("/api/cart");
+    _cart = res.ok ? ((await res.json()).items || []) : [];
+  }catch(e){
+    _cart = [];
+  }
 }
-function setCart(items){
-  const carts=db.carts();
-  carts[currentUser().id]=items;
-  db.saveCarts(carts);
-}
-function addToCart(productId,qty){
+function getCart(){ return _cart; }
+async function addToCart(productId,qty){
   if(!requireLogin()) return;
-  qty = qty || 1;
-  const items = getCart();
-  const existing = items.find(i=>i.productId===productId);
-  if(existing) existing.qty += qty; else items.push({productId,qty});
-  setCart(items);
+  const {ok,data} = await apiPost("/api/cart/items", {productId, qty: qty||1});
+  if(!ok){ toast(data.error || "Gagal menambahkan ke keranjang."); return; }
+  _cart = data.items;
   updateCartBadge();
   const bd=document.getElementById("cartBadge"); bd.classList.remove("bump"); void bd.offsetWidth; bd.classList.add("bump");
   toast("Produk ditambahkan ke keranjang.");
@@ -505,16 +500,19 @@ async function renderCart(){
   document.getElementById("cartLayout").innerHTML = `<div>${left}</div>${right}`;
   document.getElementById("footer-keranjang").innerHTML = footerHTML();
 }
-function updateCartQty(productId,d){
-  const items=getCart();
-  const it=items.find(i=>i.productId===productId);
+async function updateCartQty(productId,d){
+  const it=_cart.find(i=>i.productId===productId);
   if(!it) return;
-  it.qty=Math.max(1,it.qty+d);
-  setCart(items); renderCart(); updateCartBadge();
+  const qty=Math.max(1,it.qty+d);
+  if(qty===it.qty) return;
+  const {ok,data} = await apiRequest("PUT", `/api/cart/items/${productId}`, {qty});
+  if(!ok){ toast(data.error || "Gagal mengubah jumlah."); return; }
+  _cart=data.items; renderCart(); updateCartBadge();
 }
-function removeFromCart(productId){
-  setCart(getCart().filter(i=>i.productId!==productId));
-  renderCart(); updateCartBadge();
+async function removeFromCart(productId){
+  const {ok,data} = await apiRequest("DELETE", `/api/cart/items/${productId}`);
+  if(!ok){ toast(data.error || "Gagal menghapus produk."); return; }
+  _cart=data.items; renderCart(); updateCartBadge();
   toast("Produk dihapus dari keranjang.");
 }
 
@@ -668,7 +666,7 @@ async function placeOrder(){
   const {ok, data} = await apiRequest("POST", "/api/orders", payload);
   if(!ok){ toast(data.error || "Gagal membuat pesanan."); return; }
 
-  setCart([]); updateCartBadge(); stopQrisTimer(); vaCache={}; paymentProof=null;
+  _cart=[]; updateCartBadge(); stopQrisTimer(); vaCache={}; paymentProof=null;
   toast(isCOD ? "Pesanan dibuat! Bayar tunai saat barang tiba." : "Pesanan dibuat! Menunggu verifikasi pembayaran.");
   go("profile");
 }
@@ -781,25 +779,29 @@ function submitKontak(){
 }
 
 /* ---------- ADMIN: DASHBOARD ---------- */
-function renderAdminDashboard(){
+async function renderAdminDashboard(){
   const u=currentUser();
   if(!u||u.role!=="admin"){ toast("Halaman khusus admin."); go("login"); return; }
   document.getElementById("adminSidebar1").innerHTML = adminSidebarHTML("admin-dashboard");
   document.getElementById("adminHeader1").innerHTML = adminHeaderHTML("Dashboard Laporan Penjualan","Ringkasan performa dan transaksi toko Homey Wood");
   document.getElementById("footer-admin-dashboard").innerHTML = adminFooterHTML();
-  const orders=db.orders();
-  const totalRevenue=orders.filter(o=>o.status!=="Ditolak").reduce((s,o)=>s+o.total,0);
-  document.getElementById("kpiGrid").innerHTML = `
-    <div class="kpi"><span>Total Pendapatan</span><b>${fmt(totalRevenue)}</b></div>
-    <div class="kpi"><span>Total Transaksi</span><b>${orders.length}</b></div>
-    <div class="kpi"><span>Produk Terdaftar</span><b>${db.products().length}</b></div>
-    <div class="kpi"><span>Total Pengguna</span><b>${db.users().filter(x=>x.role==='user').length}</b></div>`;
+
   const tbody=document.querySelector("#adminRecentTable tbody");
-  const recent=orders.slice().reverse().slice(0,6);
-  tbody.innerHTML = recent.length ? recent.map(o=>{
-    const buyer=db.users().find(u2=>u2.id===o.userId);
-    return `<tr><td>${o.id}</td><td>${buyer?buyer.name:'-'}</td><td>${fmt(o.total)}</td><td><span class="status-pill ${statusClass(o.status)}">${o.status}</span></td></tr>`;
-  }).join("") : `<tr><td colspan="4" style="text-align:center;color:var(--muted)">Belum ada transaksi.</td></tr>`;
+  const res=await fetch("/api/admin/dashboard");
+  if(!res.ok){
+    document.getElementById("kpiGrid").innerHTML="";
+    tbody.innerHTML=`<tr><td colspan="4" style="text-align:center;color:var(--muted)">Gagal memuat data dashboard.</td></tr>`;
+    return;
+  }
+  const d=await res.json();
+  document.getElementById("kpiGrid").innerHTML = `
+    <div class="kpi"><span>Total Pendapatan</span><b>${fmt(d.total_revenue)}</b></div>
+    <div class="kpi"><span>Total Transaksi</span><b>${d.total_orders}</b></div>
+    <div class="kpi"><span>Produk Terdaftar</span><b>${d.total_products}</b></div>
+    <div class="kpi"><span>Total Pengguna</span><b>${d.total_customers}</b></div>`;
+  tbody.innerHTML = d.recent_orders.length ? d.recent_orders.map(o=>`
+    <tr><td>${esc(o.id)}</td><td>${esc(o.buyer)}</td><td>${fmt(o.total)}</td><td><span class="status-pill ${statusClass(o.status)}">${esc(o.status)}</span></td></tr>`).join("")
+    : `<tr><td colspan="4" style="text-align:center;color:var(--muted)">Belum ada transaksi.</td></tr>`;
 }
 
 /* ---------- ADMIN: KATALOG ---------- */
@@ -1071,6 +1073,7 @@ const NAVBAR_HTML = `<nav class="navbar">
     const r=document.querySelector('input[name="fcat"][value="'+currentFilterCat+'"]'); if(r) r.checked=true;
   }
   await refreshAuth(); // tunggu status login dari server dulu, baru render (halaman butuh tahu siapa yang login)
+  await refreshCart(); // keranjang butuh tahu siapa yang login, jadi urutannya setelah refreshAuth
   showPage(page);
   if(page==="tentang"||page==="kontak") document.getElementById("footer-"+page).innerHTML = footerHTML();
   const pt=sessionStorage.getItem("hw_pendingToast");

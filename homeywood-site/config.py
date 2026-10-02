@@ -20,4 +20,4 @@ class Config:
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "uploads")
-    MAX_CONTENT_LENGTH = 2 * 1024 * 1024  # batas upload 2 MB
+    MAX_CONTENT_LENGTH = 4 * 1024 * 1024

@@ -6,6 +6,7 @@ from flask_login import current_user, login_required
 
 from .extensions import db
 from .models import Category, Product
+from .uploads import delete_upload, save_image, upload_url
 
 catalog_bp = Blueprint("catalog", __name__, url_prefix="/api")
 
@@ -43,7 +44,15 @@ def product_to_dict(p):
         "stock": p.stock,
         "desc": p.description or "",
         "icon": p.icon_emoji or "🪵",
+        "image": upload_url(p.image_path),  # None kalau belum ada foto -> frontend pakai emoji
     }
+
+
+def get_payload():
+    """Tanpa foto frontend kirim JSON; dengan foto kirim multipart/form-data."""
+    if request.is_json:
+        return request.get_json(silent=True) or {}
+    return request.form.to_dict()
 
 
 @catalog_bp.route("/products")
@@ -80,7 +89,7 @@ def get_product(product_id):
 @catalog_bp.route("/admin/products", methods=["POST"])
 @admin_required
 def admin_create_product():
-    data = request.get_json(silent=True) or {}
+    data = get_payload()
     name = (data.get("name") or "").strip()
     category_name = (data.get("category") or "").strip()
     material = (data.get("material") or "").strip() or None
@@ -101,10 +110,20 @@ def admin_create_product():
         valid = ", ".join(c.name for c in Category.query.all())
         return jsonify({"error": f"Kategori '{category_name}' tidak ditemukan. Pilihan: {valid}"}), 400
 
+    # Foto disimpan paling akhir, setelah semua validasi lolos,
+    # supaya tidak ada file yatim kalau validasi gagal.
+    image_path = None
+    file = request.files.get("image")
+    if file and file.filename:
+        try:
+            image_path = save_image(file, "products")
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+
     product = Product(
         category_id=category.id, name=name, slug=unique_slug(slugify(name)),
         description=desc, price=price, stock=stock, material=material,
-        icon_emoji="🪵",
+        icon_emoji="🪵", image_path=image_path,
     )
     db.session.add(product)
     db.session.commit()
@@ -115,7 +134,7 @@ def admin_create_product():
 @admin_required
 def admin_update_product(product_id):
     product = Product.query.get_or_404(product_id)
-    data = request.get_json(silent=True) or {}
+    data = get_payload()
 
     if "name" in data:
         name = (data.get("name") or "").strip()
@@ -148,7 +167,22 @@ def admin_update_product(product_id):
         except (TypeError, ValueError):
             return jsonify({"error": "Stok tidak valid."}), 400
 
+    # Foto: ganti, hapus, atau biarkan. File lama dihapus setelah commit sukses.
+    old_image = None
+    file = request.files.get("image")
+    if file and file.filename:
+        try:
+            new_image = save_image(file, "products")
+        except ValueError as e:
+            return jsonify({"error": str(e)}), 400
+        old_image = product.image_path
+        product.image_path = new_image
+    elif data.get("remove_image"):
+        old_image = product.image_path
+        product.image_path = None
+
     db.session.commit()
+    delete_upload(old_image)
     return jsonify({"product": product_to_dict(product)})
 
 
