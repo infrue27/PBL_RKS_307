@@ -79,6 +79,15 @@ async function refreshAuth(){
     _authUser = null;
   }
 }
+// Foto produk kalau ada, kalau belum ada pakai emoji cadangan
+function productImgHTML(p){
+  return p.image ? `<img src="${esc(p.image)}" alt="${esc(p.name)}">` : p.icon;
+}
+// Foto profil kalau ada, kalau belum ada pakai inisial nama
+function avatarInner(u){
+  if(u.avatar_url) return `<img src="${esc(u.avatar_url)}" alt="Foto profil">`;
+  return esc(u.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase());
+}
 function fmt(n){ return "Rp " + n.toLocaleString("id-ID"); }
 function toast(msg){
   const t=document.getElementById("toast");
@@ -188,7 +197,9 @@ function adminHeaderHTML(title,subtitle){
 /* ---------- AUTH ---------- */
 async function apiRequest(method, url, body){
   const opts = { method, headers: {} };
-  if(body !== undefined){
+  if(body instanceof FormData){
+    opts.body = body; // upload file: biarkan browser yang mengisi Content-Type (multipart)
+  } else if(body !== undefined){
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
   }
@@ -362,7 +373,7 @@ function productCardHTML(p){
   const st=ratingStats(p.id);
   const last=st.rs.length? st.rs[st.rs.length-1] : null;
   return `<div class="pcard" onclick="openDetail(${p.id})">
-    <div class="thumb">${p.icon}</div>
+    <div class="thumb">${productImgHTML(p)}</div>
     <div class="info">
       <div class="name">${p.name}</div>
       <div class="price">${fmt(p.price)}</div>
@@ -406,7 +417,7 @@ async function renderDetail(){
   if(!p){ document.getElementById("detailWrap").innerHTML="<p>Produk tidak ditemukan.</p>"; return; }
   const st=ratingStats(p.id);
   document.getElementById("detailWrap").innerHTML = `
-    <div class="detail-img">${p.icon}</div>
+    <div class="detail-img">${productImgHTML(p)}</div>
     <div class="detail-info">
       <div>${st.n ? starsHTML(st.avg)+` <span style="color:var(--muted);font-size:13px">${st.avg.toFixed(1)} · ${st.n} ulasan</span>` : `<span style="color:var(--muted);font-size:13px">Belum ada ulasan</span>`}</div>
       <h1>${p.name}</h1>
@@ -475,7 +486,7 @@ async function renderCart(){
   }
   const left = items.map(i=>`
     <div class="cart-item">
-      <div class="thumb">${i.product.icon}</div>
+      <div class="thumb">${productImgHTML(i.product)}</div>
       <div class="info">
         <div class="name">${i.product.name}</div>
         <div class="price">${fmt(i.product.price)}</div>
@@ -663,23 +674,55 @@ async function placeOrder(){
 }
 
 /* ---------- PROFILE ---------- */
+let profileEditing=false;
+function toggleProfileEdit(on){ profileEditing=on; renderProfile(); }
+async function saveProfile(){
+  const payload={
+    full_name:document.getElementById("pfName").value.trim(),
+    phone:document.getElementById("pfPhone").value.trim(),
+    address:document.getElementById("pfAddress").value.trim()
+  };
+  const {ok,data}=await apiRequest("PUT","/api/profile",payload);
+  if(!ok){ toast(data.error||"Gagal menyimpan profil."); return; }
+  await refreshAuth(); profileEditing=false;
+  toast("Profil berhasil diperbarui."); renderNavbar(); renderProfile();
+}
+async function uploadAvatar(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  if(f.size>2*1024*1024){ toast("Ukuran foto maksimal 2 MB."); inp.value=""; return; }
+  const fd=new FormData(); fd.append("avatar",f);
+  const {ok,data}=await apiRequest("POST","/api/profile/avatar",fd);
+  if(!ok){ toast(data.error||"Gagal mengunggah foto."); inp.value=""; return; }
+  await refreshAuth(); toast("Foto profil diperbarui."); renderProfile();
+}
+async function removeAvatar(){
+  if(!confirm("Hapus foto profil?")) return;
+  const {ok,data}=await apiRequest("DELETE","/api/profile/avatar");
+  if(!ok){ toast(data.error||"Gagal menghapus foto."); return; }
+  await refreshAuth(); toast("Foto profil dihapus."); renderProfile();
+}
 async function renderProfile(){
   if(!requireLogin()) return;
   const u=currentUser();
   const orderRes = await fetch("/api/orders");
   const orderData = await orderRes.json();
   const myOrders = orderRes.ok ? (orderData.orders || []) : [];
-  const initials=u.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase();
-  document.getElementById("profileContent").innerHTML = `
-    <div class="profile-head">
-      <div class="avatar">${initials}</div>
-      <div>
-        <div style="font-weight:700;font-size:17px">${u.name}</div>
-        <div style="font-size:13px;color:var(--muted)">${u.email}</div>
-      </div>
-    </div>
+  const infoCard = profileEditing ? `
     <div class="card" style="margin-bottom:24px">
-      <h3 style="margin-top:0">Informasi Pribadi</h3>
+      <h3 style="margin-top:0">Edit Informasi Pribadi</h3>
+      <div class="two-col">
+        <div class="form-row"><label>Nama Lengkap</label><input id="pfName" value="${esc(u.name)}"></div>
+        <div class="form-row"><label>No. WhatsApp</label><input id="pfPhone" value="${esc(u.phone)}"></div>
+      </div>
+      <div class="form-row"><label>Alamat</label><textarea id="pfAddress" rows="2">${esc(u.address)}</textarea></div>
+      <button class="btn btn-primary btn-sm" onclick="saveProfile()">Simpan</button>
+      <button class="btn btn-outline btn-sm" onclick="toggleProfileEdit(false)">Batal</button>
+    </div>` : `
+    <div class="card" style="margin-bottom:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <h3 style="margin:0 0 12px">Informasi Pribadi</h3>
+        <button class="btn btn-outline btn-sm" onclick="toggleProfileEdit(true)">Edit Profil</button>
+      </div>
       <div class="two-col">
         <div><div style="font-size:12px;color:var(--muted)">Nama Lengkap</div><div style="font-size:14.5px;font-weight:600">${u.name}</div></div>
         <div><div style="font-size:12px;color:var(--muted)">Username</div><div style="font-size:14.5px;font-weight:600">${u.username||'-'}</div></div>
@@ -687,7 +730,20 @@ async function renderProfile(){
         <div><div style="font-size:12px;color:var(--muted)">No. WhatsApp</div><div style="font-size:14.5px;font-weight:600">${u.phone}</div></div>
         <div><div style="font-size:12px;color:var(--muted)">Alamat</div><div style="font-size:14.5px;font-weight:600">${u.address}</div></div>
       </div>
+    </div>`;
+  document.getElementById("profileContent").innerHTML = `
+    <div class="profile-head">
+      <div class="avatar avatar-lg">${avatarInner(u)}</div>
+      <div>
+        <div style="font-weight:700;font-size:17px">${esc(u.name)}</div>
+        <div style="font-size:13px;color:var(--muted);margin-bottom:8px">${esc(u.email)}</div>
+        <label class="btn btn-outline btn-sm" style="cursor:pointer">📷 ${u.avatar_url?"Ganti":"Tambah"} Foto
+          <input type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadAvatar(this)">
+        </label>
+        ${u.avatar_url?`<button class="btn btn-outline btn-sm" onclick="removeAvatar()">Hapus Foto</button>`:""}
+      </div>
     </div>
+    ${infoCard}
     <h3>Riwayat Pembelian</h3>
     ${myOrders.length===0 ? `<div class="empty-state"><div>📦</div>Belum ada riwayat pembelian.</div>` :
       myOrders.map(o=>`
@@ -749,7 +805,25 @@ function renderAdminDashboard(){
 /* ---------- ADMIN: KATALOG ---------- */
 function showAddProductForm(){ document.getElementById("addProductForm").style.display="block"; editingProductId=null; clearProductForm(); }
 function hideAddProductForm(){ document.getElementById("addProductForm").style.display="none"; }
-function clearProductForm(){ apName.value=""; apPrice.value=""; apStock.value=""; apDesc.value=""; apCat.value="Sofa"; }
+function clearProductForm(){
+  apName.value=""; apPrice.value=""; apStock.value=""; apDesc.value=""; apCat.value="Sofa";
+  apImage.value=""; removeImageFlag=false; showImagePreview(null);
+}
+let removeImageFlag=false;
+function showImagePreview(src){
+  const box=document.getElementById("apImagePreview");
+  box.innerHTML = src ? `<img src="${esc(src)}" alt="Preview">` : `<span class="muted" style="font-size:12px">Belum ada foto</span>`;
+  document.getElementById("apImageRemove").style.display = src ? "inline-block" : "none";
+}
+function onProductImagePick(inp){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  if(f.size>2*1024*1024){ toast("Ukuran foto maksimal 2 MB."); inp.value=""; return; }
+  removeImageFlag=false;
+  showImagePreview(URL.createObjectURL(f));
+}
+function clearProductImage(){
+  apImage.value=""; removeImageFlag=true; showImagePreview(null);
+}
 let editingProductId=null;
 let adminProductsList=[]; // list terakhir dari server, dipakai editProduct/deleteProduct di bawah
 async function renderAdminKatalog(){
@@ -762,7 +836,7 @@ async function renderAdminKatalog(){
   const tbody=document.querySelector("#adminProductTable tbody");
   tbody.innerHTML = adminProductsList.map(p=>`
     <tr>
-      <td><div class="mini">${p.icon}</div></td>
+      <td><div class="mini">${productImgHTML(p)}</div></td>
       <td>${p.name}</td>
       <td>${p.category}</td>
       <td>${fmt(p.price)}</td>
@@ -779,12 +853,26 @@ function editProduct(id){
   editingProductId=id;
   document.getElementById("addProductForm").style.display="block";
   apName.value=p.name; apCat.value=p.category; apPrice.value=p.price; apStock.value=p.stock; apDesc.value=p.desc;
+  apImage.value=""; removeImageFlag=false; showImagePreview(p.image||null);
   window.scrollTo(0,0);
 }
 async function saveProduct(){
   const name=apName.value.trim(), cat=apCat.value, price=Number(apPrice.value), stock=Number(apStock.value), desc=apDesc.value.trim();
-  if(!name||!price||!stock){ toast("Lengkapi data produk."); return; }
-  const payload={name, category:cat, price, stock, desc};
+  if(!name||!price||apStock.value===""){ toast("Lengkapi data produk."); return; }
+  // Tanpa foto -> kirim JSON seperti biasa (backend lama tetap jalan).
+  // Ada foto / hapus foto -> kirim FormData supaya file ikut terkirim.
+  const file=apImage.files&&apImage.files[0];
+  const wantsRemove=removeImageFlag && editingProductId;
+  let payload;
+  if(file || wantsRemove){
+    payload=new FormData();
+    payload.append("name",name); payload.append("category",cat);
+    payload.append("price",price); payload.append("stock",stock); payload.append("desc",desc);
+    if(file) payload.append("image",file);
+    else payload.append("remove_image","1");
+  } else {
+    payload={name, category:cat, price, stock, desc};
+  }
 
   const {ok, data} = editingProductId
     ? await apiRequest("PUT", `/api/admin/products/${editingProductId}`, payload)
