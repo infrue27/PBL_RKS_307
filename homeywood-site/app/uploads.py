@@ -1,5 +1,5 @@
 """
-Helper upload gambar: dipakai foto produk dan foto profil.
+Helper upload gambar: foto produk, foto profil, dan foto ulasan.
 
 Keamanan:
 - Tipe file ditentukan dari ISI file (magic bytes), bukan dari nama/ekstensi
@@ -7,7 +7,9 @@ Keamanan:
 - Hanya JPG, PNG, WEBP. SVG sengaja tidak diizinkan (bisa menyisipkan script).
 - Nama file disimpan acak (uuid), jadi nama dari user tidak pernah dipakai.
 """
+import base64
 import os
+import re
 import uuid
 
 from flask import current_app
@@ -25,9 +27,8 @@ def _detect_ext(head):
     return None
 
 
-def save_image(file_storage, subfolder, max_bytes=MAX_IMAGE_BYTES):
-    """Simpan gambar ke uploads/<subfolder>/. Return path relatif, atau raise ValueError."""
-    raw = file_storage.read(max_bytes + 1)
+def save_image_bytes(raw, subfolder, max_bytes=MAX_IMAGE_BYTES):
+    """Validasi lalu simpan gambar (bytes) ke uploads/<subfolder>/. Return path relatif, atau raise ValueError."""
     if len(raw) > max_bytes:
         raise ValueError("Ukuran foto maksimal 2 MB.")
     ext = _detect_ext(raw[:12])
@@ -40,6 +41,25 @@ def save_image(file_storage, subfolder, max_bytes=MAX_IMAGE_BYTES):
     with open(os.path.join(folder, filename), "wb") as f:
         f.write(raw)
     return f"{subfolder}/{filename}"
+
+
+def save_image(file_storage, subfolder, max_bytes=MAX_IMAGE_BYTES):
+    """Untuk upload file biasa (multipart): foto produk dan foto profil."""
+    raw = file_storage.read(max_bytes + 1)
+    return save_image_bytes(raw, subfolder, max_bytes)
+
+
+def decode_data_url(data_url):
+    """Untuk foto yang dikirim sebagai data URL (foto ulasan). Return bytes, atau raise ValueError."""
+    if not isinstance(data_url, str):
+        raise ValueError("Format foto tidak valid.")
+    m = re.match(r"^data:image/[\w.+-]+;base64,(.+)$", data_url, re.S)
+    if not m:
+        raise ValueError("Format foto tidak valid.")
+    try:
+        return base64.b64decode(m.group(1), validate=True)
+    except Exception:
+        raise ValueError("Format foto tidak valid.")
 
 
 def delete_upload(rel_path):

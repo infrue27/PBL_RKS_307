@@ -6,6 +6,7 @@ from flask_login import current_user, login_required
 
 from .extensions import db
 from .models import Category, Product
+from .ratings import rating_data_for
 from .uploads import delete_upload, save_image, upload_url
 
 catalog_bp = Blueprint("catalog", __name__, url_prefix="/api")
@@ -34,7 +35,7 @@ def unique_slug(base):
     return slug
 
 
-def product_to_dict(p):
+def product_to_dict(p, rating=None):
     return {
         "id": p.id,
         "name": p.name,
@@ -44,7 +45,8 @@ def product_to_dict(p):
         "stock": p.stock,
         "desc": p.description or "",
         "icon": p.icon_emoji or "🪵",
-        "image": upload_url(p.image_path),  # None kalau belum ada foto -> frontend pakai emoji
+        "image": upload_url(p.image_path),
+        "rating": rating or {"avg": 0, "count": 0, "latest": None},
     }
 
 
@@ -73,7 +75,8 @@ def list_products():
         q = q.filter(db.or_(Product.name.ilike(like), Product.description.ilike(like)))
 
     products = q.order_by(Product.created_at.desc()).all()
-    return jsonify({"products": [product_to_dict(p) for p in products]})
+    ratings = rating_data_for([p.id for p in products])
+    return jsonify({"products": [product_to_dict(p, ratings[p.id]) for p in products]})
 
 
 @catalog_bp.route("/products/<int:product_id>")
@@ -81,7 +84,7 @@ def get_product(product_id):
     p = Product.query.get_or_404(product_id)
     if not p.is_active:
         return jsonify({"error": "Produk tidak ditemukan."}), 404
-    return jsonify({"product": product_to_dict(p)})
+    return jsonify({"product": product_to_dict(p, rating_data_for([p.id])[p.id])})
 
 
 # ============ Khusus admin: tambah / edit / hapus produk ============

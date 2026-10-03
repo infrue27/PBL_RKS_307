@@ -73,15 +73,45 @@ class Product(db.Model):
 
 class Review(db.Model):
     __tablename__ = "reviews"
+    __table_args__ = (db.UniqueConstraint("order_id", "product_id", name="uq_review_order_product"),)
 
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="SET NULL"))
     rating = db.Column(db.SmallInteger, nullable=False)
     comment = db.Column(db.Text)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
 
     product = db.relationship("Product", back_populates="reviews")
+    user = db.relationship("User")
+    order = db.relationship("Order", back_populates="reviews")
+    images = db.relationship("ReviewImage", back_populates="review",
+                             cascade="all, delete-orphan", order_by="ReviewImage.id")
+    comments = db.relationship("ReviewComment", back_populates="review",
+                               cascade="all, delete-orphan", order_by="ReviewComment.id")
+
+
+class ReviewImage(db.Model):
+    __tablename__ = "review_images"
+
+    id = db.Column(db.Integer, primary_key=True)
+    review_id = db.Column(db.Integer, db.ForeignKey("reviews.id", ondelete="CASCADE"), nullable=False)
+    image_path = db.Column(db.String(255), nullable=False)
+
+    review = db.relationship("Review", back_populates="images")
+
+
+class ReviewComment(db.Model):
+    __tablename__ = "review_comments"
+
+    id = db.Column(db.Integer, primary_key=True)
+    review_id = db.Column(db.Integer, db.ForeignKey("reviews.id", ondelete="CASCADE"), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    comment = db.Column(db.String(200), nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    review = db.relationship("Review", back_populates="comments")
     user = db.relationship("User")
 
 
@@ -108,6 +138,7 @@ class Order(db.Model):
     total_amount = db.Column(db.Numeric(14, 2), nullable=False)
     shipping_address = db.Column(db.Text, nullable=False)
     payment_label = db.Column(db.String(100))  # contoh: "Transfer Bank BCA (VA: 39017...)"
+    reviews = db.relationship("Review", back_populates="order")
     status = db.Column(db.Enum(*ORDER_STATUSES), nullable=False, default="menunggu_pembayaran")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())

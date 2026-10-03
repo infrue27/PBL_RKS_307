@@ -72,6 +72,9 @@ def create_app(config_class=Config):
     from .cart import cart_bp
     app.register_blueprint(cart_bp)
 
+    from .reviews import reviews_bp
+    app.register_blueprint(reviews_bp)
+
     # ---- Folder upload (bukti bayar, nanti avatar juga) ----
     app.config["UPLOAD_ROOT"] = os.path.join(BASE_DIR, app.config.get("UPLOAD_FOLDER", "uploads"))
     os.makedirs(app.config["UPLOAD_ROOT"], exist_ok=True)
@@ -83,8 +86,8 @@ def create_app(config_class=Config):
             abort(404)
         folder = parts[0]
 
-        if folder == "products":
-            pass  # foto produk publik: tamu yang belum login juga melihat katalog
+        if folder in ("products", "reviews"):
+            pass  # foto produk & foto ulasan publik: tamu yang belum login juga melihatnya
         elif not current_user.is_authenticated:
             return login_manager.unauthorized()
         elif folder == "avatars":

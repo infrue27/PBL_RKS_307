@@ -263,24 +263,26 @@ function requireLogin(){
 /* ---------- HELPER: ESCAPE, RATING, STATUS ---------- */
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function todayStr(){ return new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"}); }
-function reviewsFor(pid){ return db.reviews().filter(r=>r.productId===pid); }
-function ratingStats(pid){ const rs=reviewsFor(pid); const n=rs.length; const avg=n? rs.reduce((t,r)=>t+r.rating,0)/n : 0; return {n,avg,rs}; }
+function ratingStatsFrom(rs){ const n=rs.length; const avg=n? rs.reduce((t,r)=>t+r.rating,0)/n : 0; return {n,avg,rs}; }
+function ratingOf(p){ const r=p.rating||{}; return {n:r.count||0, avg:r.avg||0, latest:r.latest||null}; }
 function starsHTML(v){ const f=Math.round(v); return '<span class="stars">'+"★".repeat(f)+'<span style="color:#D9CDB8">'+"★".repeat(5-f)+'</span></span>'; }
 function statusClass(st){ return st==="Selesai"?"status-done":st==="Ditolak"?"status-rejected":(st==="Dikirim"||st==="Diproses")?"status-ship":"status-pending"; }
 
 /* ---------- ULASAN, RATING & KOMENTAR ---------- */
-function renderReviews(p){
-  const st=ratingStats(p.id);
+async function renderReviews(p){
   let box=document.getElementById("reviewSection");
   if(!box){ box=document.createElement("div"); box.id="reviewSection"; document.getElementById("detailWrap").insertAdjacentElement("afterend",box); }
-  const dist=[5,4,3,2,1].map(k=>{ const c=st.rs.filter(r=>r.rating===k).length;
+  const res=await fetch(`/api/products/${p.id}/reviews`);
+  const rs=res.ok ? ((await res.json()).reviews||[]) : [];
+  const st=ratingStatsFrom(rs);
+  const dist=[5,4,3,2,1].map(k=>{ const c=rs.filter(r=>r.rating===k).length;
     return `<div class="dist-row"><span>${k}★</span><div class="dist-bar"><i style="width:${st.n?c/st.n*100:0}%"></i></div><span>${c}</span></div>`; }).join("");
   box.innerHTML = `<h3 style="margin:34px 0 12px">Rating & Ulasan Pembeli</h3>
     <div class="review-summary card">
       <div class="big-rating"><b>${st.n?st.avg.toFixed(1):"–"}</b>${starsHTML(st.avg)}<small class="muted">${st.n} ulasan</small></div>
       <div class="dist">${dist}</div>
     </div>
-    ${st.n ? st.rs.slice().reverse().map(reviewHTML).join("") : `<div class="empty-state"><div>💬</div>Belum ada ulasan. Ulasan bisa ditulis pembeli setelah barang tiba di alamat tujuan.</div>`}`;
+    ${st.n ? rs.map(reviewHTML).join("") : `<div class="empty-state"><div>💬</div>Belum ada ulasan. Ulasan bisa ditulis pembeli setelah barang tiba di alamat tujuan.</div>`}`;
 }
 function reviewHTML(r){
   const cs=(r.comments||[]).map(c=>`<div class="comment ${c.isAdmin?'by-admin':''}"><b>${esc(c.name)}</b>${c.isAdmin?' <em>Penjual</em>':''} <span class="muted">· ${esc(c.date)}</span><div>${esc(c.text)}</div></div>`).join("");
@@ -293,13 +295,13 @@ function reviewHTML(r){
     <div class="comment-form"><input id="cm-${r.id}" placeholder="Tulis komentar..." maxlength="200" onkeydown="if(event.key==='Enter')addComment('${r.id}')"><button class="btn btn-outline btn-sm" onclick="addComment('${r.id}')">Kirim</button></div>
   </div>`;
 }
-function addComment(rid){
+async function addComment(rid){
   if(!requireLogin()) return;
   const inp=document.getElementById("cm-"+rid); const text=inp.value.trim();
   if(!text){ toast("Komentar tidak boleh kosong."); return; }
-  const u=currentUser(); const rs=db.reviews(); const r=rs.find(x=>x.id===rid); if(!r) return;
-  (r.comments=r.comments||[]).push({name:u.name,isAdmin:u.role==="admin",text,date:todayStr()});
-  db.saveReviews(rs); toast("Komentar terkirim.");
+  const {ok,data}=await apiPost(`/api/reviews/${rid}/comments`,{text});
+  if(!ok){ toast(data.error||"Gagal mengirim komentar."); return; }
+  toast("Komentar terkirim.");
   renderReviews(db.products().find(x=>x.id===currentDetailId));
 }
 let reviewCtx=null, reviewStars=0, reviewImages=[];
@@ -335,14 +337,12 @@ function viewImage(src){
   m.addEventListener("click",()=>m.remove()); document.body.appendChild(m);
 }
 function closeReviewModal(){ const m=document.getElementById("reviewModal"); if(m) m.remove(); }
-function submitReview(){
+async function submitReview(){
   const text=document.getElementById("rvText").value.trim();
   if(!reviewStars){ toast("Pilih rating bintang dulu."); return; }
   if(text.length<5){ toast("Tulis ulasan minimal 5 karakter."); return; }
-  const u=currentUser(); const rs=db.reviews();
-  if(rs.some(r=>r.orderId===reviewCtx.orderId&&r.productId===reviewCtx.pid)){ toast("Produk ini sudah diulas."); return; }
-  rs.push({id:"R"+Date.now(),productId:reviewCtx.pid,orderId:reviewCtx.orderId,userId:u.id,userName:u.name,rating:reviewStars,text,images:reviewImages.slice(),date:todayStr(),comments:[]});
-  try{ db.saveReviews(rs); }catch(e){ rs.pop(); toast("Penyimpanan penuh, kurangi jumlah foto."); return; }
+  const {ok,data}=await apiPost("/api/reviews",{orderCode:reviewCtx.orderId, productId:reviewCtx.pid, rating:reviewStars, text, images:reviewImages});
+  if(!ok){ toast(data.error||"Gagal mengirim ulasan."); return; }
   closeReviewModal(); toast("Terima kasih, ulasan terkirim!"); renderProfile();
 }
 async function confirmArrived(id){
@@ -354,26 +354,25 @@ function orderActionsHTML(o){
   let h="";
   if(o.status==="Dikirim") h+=`<button class="btn btn-primary btn-sm" onclick="confirmArrived('${o.id}')">📦 Barang Sudah Tiba</button>`;
   if(o.status==="Selesai"){
-    const rs=db.reviews(), prods=db.products();
-    h+=o.items.map(i=>{ const pid=i.productId||(prods.find(x=>x.name===i.name)||{}).id; if(!pid) return "";
-      return rs.find(r=>r.orderId===o.id&&r.productId===pid)
+    h+=o.items.map(i=>{ if(!i.productId) return "";
+      return i.reviewed
         ? `<span class="reviewed">✓ Sudah diulas: ${esc(i.name)}</span>`
-        : `<button class="btn btn-outline btn-sm" onclick="openReviewModal('${o.id}',${pid})">⭐ Beri ulasan: ${esc(i.name)}</button>`; }).join("");
+        : `<button class="btn btn-outline btn-sm" onclick="openReviewModal('${o.id}',${i.productId})">⭐ Beri ulasan: ${esc(i.name)}</button>`; }).join("");
   }
   return h? `<div class="order-actions">${h}</div>` : "";
 }
 
 /* ---------- HOME ---------- */
 function productCardHTML(p){
-  const st=ratingStats(p.id);
-  const last=st.rs.length? st.rs[st.rs.length-1] : null;
+  const st=ratingOf(p);
+  const last=st.latest;
   return `<div class="pcard" onclick="openDetail(${p.id})">
     <div class="thumb">${productImgHTML(p)}</div>
     <div class="info">
       <div class="name">${p.name}</div>
       <div class="price">${fmt(p.price)}</div>
       <div class="rating-line">${st.n ? starsHTML(st.avg)+` <b>${st.avg.toFixed(1)}</b> <span class="muted">(${st.n} ulasan)</span>` : `<span class="muted">Belum ada ulasan</span>`}</div>
-      ${last ? `<div class="review-snippet">"${esc(last.text)}"${(last.images&&last.images.length)?" 📷":""} <span>— ${esc(last.userName)}</span></div>` : ""}
+      ${last ? `<div class="review-snippet">"${esc(last.text)}"${last.hasImages?" 📷":""} <span>— ${esc(last.userName)}</span></div>` : ""}
       <div class="row"><span></span>
         <button class="add-btn" onclick="event.stopPropagation();addToCart(${p.id})">+</button>
       </div>
@@ -410,7 +409,7 @@ function openDetail(id){ currentDetailId=id; sessionStorage.setItem("hw_detailId
 async function renderDetail(){
   const p = await fetchProductDetail(currentDetailId);
   if(!p){ document.getElementById("detailWrap").innerHTML="<p>Produk tidak ditemukan.</p>"; return; }
-  const st=ratingStats(p.id);
+  const st=ratingOf(p);
   document.getElementById("detailWrap").innerHTML = `
     <div class="detail-img">${productImgHTML(p)}</div>
     <div class="detail-info">
@@ -762,20 +761,25 @@ async function renderProfile(){
 }
 
 /* ---------- KONTAK ---------- */
+// Nomor WhatsApp toko: format internasional, tanpa "+" dan tanpa 0 di depan (62 = Indonesia)
+const WA_STORE_NUMBER = "6281270655757";
+
 function submitKontak(){
   const nama=document.getElementById("kNama").value.trim();
   const email=document.getElementById("kEmail").value.trim();
   const alasan=document.getElementById("kAlasan").value.trim();
   const wa=document.getElementById("kWa").value.trim();
   if(!nama||!email||!alasan||!wa){ toast("Mohon lengkapi semua kolom."); return; }
-  const messages=db.messages();
-  messages.push({nama,email,alasan,wa,date:new Date().toISOString()});
-  db.saveMessages(messages);
-  document.getElementById("kNama").value="";
-  document.getElementById("kEmail").value="";
-  document.getElementById("kAlasan").value="";
-  document.getElementById("kWa").value="";
-  toast("Pesan terkirim! Tim kami akan segera menghubungi Anda.");
+  if(alasan.length>800){ toast("Pesan terlalu panjang (maksimal 800 karakter)."); return; }
+
+  const text =
+    "Halo Homey Wood, saya ingin bertanya.\n\n" +
+    "Nama: "+nama+"\n" +
+    "Email: "+email+"\n" +
+    "No. WhatsApp: "+wa+"\n\n" +
+    "Pesan:\n"+alasan;
+  window.open("https://wa.me/"+WA_STORE_NUMBER+"?text="+encodeURIComponent(text), "_blank", "noopener");
+  toast("Membuka WhatsApp... tekan Kirim di sana untuk mengirim pesan.");
 }
 
 /* ---------- ADMIN: DASHBOARD ---------- */

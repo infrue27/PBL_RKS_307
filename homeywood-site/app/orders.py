@@ -87,11 +87,13 @@ def order_to_dict(order):
     subtotal = sum(float(i.subtotal) for i in order.items)
     shipping = float(order.total_amount) - subtotal
     proof_url = f"/uploads/{order.payment.proof_path}" if order.payment else None
+    reviewed_ids = {r.product_id for r in order.reviews}
     return {
         "id": order.order_code,
         "userId": order.user_id,
         "items": [
-            {"productId": i.product_id, "name": i.product_name, "qty": i.quantity, "price": float(i.unit_price)}
+            {"productId": i.product_id, "name": i.product_name, "qty": i.quantity,
+             "price": float(i.unit_price), "reviewed": i.product_id in reviewed_ids}
             for i in order.items
         ],
         "subtotal": subtotal,
