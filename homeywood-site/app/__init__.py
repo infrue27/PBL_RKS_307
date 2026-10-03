@@ -14,7 +14,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # Tambahkan nama file baru ke sini kalau temanmu bikin halaman baru
 ALLOWED_PAGES = {
     "home", "katalog", "detail", "keranjang", "checkout", "profile",
-    "kontak", "tentang", "login", "register",
+    "kontak", "tentang", "login", "register", "lupa-password", "reset-password",
     "admin-dashboard", "admin-katalog", "admin-user", "admin-verifikasi",
 }
 
@@ -53,6 +53,9 @@ def create_app(config_class=Config):
 
     from .auth import auth_bp
     app.register_blueprint(auth_bp)
+
+    from .password_reset import reset_bp
+    app.register_blueprint(reset_bp)
 
     from .catalog import catalog_bp
     app.register_blueprint(catalog_bp)

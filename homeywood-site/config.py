@@ -19,5 +19,16 @@ class Config:
     # Cek koneksi sebelum dipakai, supaya tidak error kalau koneksi ke VM DB putus
     SQLALCHEMY_ENGINE_OPTIONS = {"pool_pre_ping": True}
 
+    # ---- Email (untuk link reset password). Kosongkan MAIL_HOST saat development:
+    # link reset akan dicetak di terminal, tidak dikirim lewat email.
+    MAIL_HOST = os.environ.get("MAIL_HOST", "")
+    MAIL_PORT = int(os.environ.get("MAIL_PORT", "587"))
+    MAIL_USER = os.environ.get("MAIL_USER", "")
+    MAIL_PASSWORD = os.environ.get("MAIL_PASSWORD", "")
+    MAIL_FROM = os.environ.get("MAIL_FROM", "Homey Wood <no-reply@homeywood.com>")
+    # Alamat publik website, dipakai membuat link di email. Contoh: https://homeywood.com
+    APP_BASE_URL = os.environ.get("APP_BASE_URL", "")
+    RESET_TOKEN_MINUTES = int(os.environ.get("RESET_TOKEN_MINUTES", "30"))
+
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "uploads")
     MAX_CONTENT_LENGTH = 4 * 1024 * 1024

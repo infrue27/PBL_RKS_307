@@ -97,6 +97,8 @@ CREATE TABLE orders (
   user_id          INT UNSIGNED  NOT NULL,
   total_amount     DECIMAL(14,2) NOT NULL,
   shipping_address TEXT          NOT NULL,
+  recipient_name   VARCHAR(100)  NULL,                 -- snapshot nama lengkap untuk label pengiriman
+  recipient_phone  VARCHAR(20)   NULL,
   status           ENUM('menunggu_pembayaran','menunggu_verifikasi',
                         'diproses','dikirim','selesai','ditolak','dibatalkan')
                    NOT NULL DEFAULT 'menunggu_pembayaran',
@@ -158,3 +160,18 @@ INSERT INTO categories (name, slug) VALUES
 -- CREATE USER 'homey_app'@'10.0.10.%' IDENTIFIED BY 'GANTI_PASSWORD_KUAT';
 -- GRANT SELECT, INSERT, UPDATE, DELETE ON homeywood.* TO 'homey_app'@'10.0.10.%';
 -- FLUSH PRIVILEGES;
+
+
+-- --------------------------------------------------------------------------
+-- PASSWORD RESETS: token reset password (hanya hash yang disimpan)
+-- --------------------------------------------------------------------------
+CREATE TABLE password_resets (
+  id         INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  user_id    INT UNSIGNED NOT NULL,
+  token_hash CHAR(64)     NOT NULL UNIQUE,
+  expires_at DATETIME     NOT NULL,
+  used_at    DATETIME     NULL,
+  created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT fk_pwreset_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  INDEX idx_pwreset_user (user_id)
+) ENGINE=InnoDB;

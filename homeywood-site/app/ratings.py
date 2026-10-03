@@ -45,7 +45,7 @@ def rating_data_for(product_ids):
     for r in latest:
         result[r.product_id]["latest"] = {
             "text": r.comment or "",
-            "userName": r.user.full_name if r.user else "Pengguna",
+            "userName": r.user.username if r.user else "Pengguna",
             "hasImages": bool(r.images),
         }
     return result

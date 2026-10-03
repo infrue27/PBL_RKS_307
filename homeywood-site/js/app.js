@@ -64,6 +64,8 @@ let _authUser = null; // diisi refreshAuth() saat boot() dan tiap habis login/re
 function currentUser(){
   return _authUser;
 }
+// Nama yang tampil di website = username. Nama lengkap hanya untuk label/pengiriman.
+function displayName(u){ return (u && (u.username||u.name)) || ""; }
 
 async function refreshAuth(){
   try{
@@ -81,7 +83,7 @@ function productImgHTML(p){
 // Foto profil kalau ada, kalau belum ada pakai inisial nama
 function avatarInner(u){
   if(u.avatar_url) return `<img src="${esc(u.avatar_url)}" alt="Foto profil">`;
-  return esc(u.name.split(" ").map(s=>s[0]).join("").slice(0,2).toUpperCase());
+  return esc(displayName(u).slice(0,2).toUpperCase());
 }
 function fmt(n){ return "Rp " + n.toLocaleString("id-ID"); }
 function toast(msg){
@@ -136,7 +138,7 @@ function renderNavbar(){
   const cartWrap = document.getElementById("cartIconWrap");
   cartWrap.style.display="flex";
   if(u){
-    menu.innerHTML = `<div class="who">Halo, <b>${u.name}</b></div>
+    menu.innerHTML = `<div class="who">Halo, <b>${esc(displayName(u))}</b></div>
       <a onclick="go('profile')">Profil Saya</a>
       <a onclick="go('keranjang')">Keranjang Saya</a>
       <button onclick="logout()">Keluar</button>`;
@@ -173,7 +175,7 @@ function adminSidebarHTML(active){
       </nav>
     </div>
     <div class="sidebar-footer">
-      <div class="sidebar-user">${u?u.name:''}</div>
+      <div class="sidebar-user">${u?esc(displayName(u)):''}</div>
       <button class="sidebar-logout" onclick="logout()">Keluar</button>
     </div>`;
 }
@@ -217,7 +219,7 @@ async function doLogin(){
   document.getElementById("loginEmail").value="";
   document.getElementById("loginPass").value="";
   if(_authUser.role==="admin"){ toast("Berhasil masuk sebagai Admin."); go("admin-dashboard"); }
-  else { toast("Selamat datang kembali, "+_authUser.full_name+"!"); go("home"); }
+  else { toast("Selamat datang kembali, "+displayName(_authUser)+"!"); go("home"); }
 }
 
 async function doRegister(){
@@ -244,7 +246,7 @@ async function doRegister(){
   _authUser = data.user;
   document.getElementById("regPass").value="";
   document.getElementById("regPassConfirm").value="";
-  toast("Akun berhasil dibuat. Selamat datang, "+full_name+"!");
+  toast("Akun berhasil dibuat. Selamat datang, "+username+"!");
   go("home");
 }
 
@@ -618,7 +620,7 @@ async function renderCheckout(){
   const left = `
     <div class="card" style="margin-bottom:16px">
       <h3 style="margin-top:0">1. Alamat Pengiriman</h3>
-      <p style="font-size:14px"><b>${u.name}</b><br>${u.phone}<br>${u.address}</p>
+      <p style="font-size:14px"><span class="muted" style="font-size:12px">Penerima (sesuai nama lengkap)</span><br><b>${esc(u.name)}</b><br>${esc(u.phone)}<br>${esc(u.address)}</p>
       <label class="zone-label">Wilayah tujuan (untuk hitung ongkir)</label>
       <select class="zone-select" onchange="chooseZone(this.value)">${ZONES.map(z=>`<option value="${z.key}" ${z.key===selectedZone?'selected':''}>${z.name}</option>`).join("")}</select>
     </div>
@@ -721,7 +723,7 @@ async function renderProfile(){
         <button class="btn btn-outline btn-sm" onclick="toggleProfileEdit(true)">Edit Profil</button>
       </div>
       <div class="two-col">
-        <div><div style="font-size:12px;color:var(--muted)">Nama Lengkap</div><div style="font-size:14.5px;font-weight:600">${u.name}</div></div>
+        <div><div style="font-size:12px;color:var(--muted)">Nama Lengkap <span style="font-weight:400">(untuk label pengiriman)</span></div><div style="font-size:14.5px;font-weight:600">${esc(u.name)}</div></div>
         <div><div style="font-size:12px;color:var(--muted)">Username</div><div style="font-size:14.5px;font-weight:600">${u.username||'-'}</div></div>
         <div><div style="font-size:12px;color:var(--muted)">Email</div><div style="font-size:14.5px;font-weight:600">${u.email}</div></div>
         <div><div style="font-size:12px;color:var(--muted)">No. WhatsApp</div><div style="font-size:14.5px;font-weight:600">${u.phone}</div></div>
@@ -732,7 +734,7 @@ async function renderProfile(){
     <div class="profile-head">
       <div class="avatar avatar-lg">${avatarInner(u)}</div>
       <div>
-        <div style="font-weight:700;font-size:17px">${esc(u.name)}</div>
+        <div style="font-weight:700;font-size:17px">${esc(displayName(u))}</div>
         <div style="font-size:13px;color:var(--muted);margin-bottom:8px">${esc(u.email)}</div>
         <label class="btn btn-outline btn-sm" style="cursor:pointer">📷 ${u.avatar_url?"Ganti":"Tambah"} Foto
           <input type="file" accept="image/jpeg,image/png,image/webp" hidden onchange="uploadAvatar(this)">
@@ -961,11 +963,12 @@ async function renderAdminVerifikasi(){
   const row=(o,actions)=>{
     return `<div class="order-row">
       <div>
-        <div style="font-weight:600">${o.id} · ${o.buyer?esc(o.buyer.name):'-'}</div>
+        <div style="font-weight:600">${o.id} · ${o.recipient?esc(o.recipient.name):(o.buyer?esc(o.buyer.name):'-')}${o.buyer?` <span class="muted" style="font-weight:400;font-size:12px">@${esc(o.buyer.username)}</span>`:''}</div>
+        ${o.recipient?`<div style="font-size:12.5px;color:var(--muted)">📍 ${esc(o.recipient.phone)} · ${esc(o.recipient.address)}</div>`:''}
         <div style="font-size:12.5px;color:var(--muted)">${o.items.map(i=>esc(i.name)+" x"+i.qty).join(", ")} · ${esc(o.payment||'')}</div>
         ${o.proof?`<img class="proof-thumb" src="${o.proof}" onclick="viewProof('${o.id}')" title="Klik untuk memperbesar">`:`<div style="font-size:12px;color:var(--muted);margin-top:6px">${/COD/.test(o.payment||"")?"COD · tanpa bukti":"Bukti tidak tersedia"}</div>`}
       </div>
-      <div style="text-align:right"><div style="font-weight:700;margin-bottom:8px">${fmt(o.total)}</div>${actions}</div>
+      <div style="text-align:right"><div style="font-weight:700;margin-bottom:8px">${fmt(o.total)}</div>${actions} <button class="btn btn-outline btn-sm" onclick="printLabel('${o.id}')">🖨️ Label pengiriman</button></div>
     </div>`;
   };
   const sec=(t,list,fn,empty)=>`<h3 style="margin:22px 0 10px">${t} (${list.length})</h3>`+(list.length?list.map(fn).join(""):`<div class="empty-state" style="padding:18px">${empty}</div>`);
@@ -1039,6 +1042,50 @@ function footerHTML(){
 }
 function adminFooterHTML(){
   return `<footer class="admin-footer">© 2026 Homey Wood — Admin Portal. Seluruh hak cipta dilindungi.</footer>`;
+}
+
+/* ---------- LUPA & RESET PASSWORD ---------- */
+async function doForgotPassword(){
+  const email=document.getElementById("forgotEmail").value.trim();
+  if(!email){ toast("Isi email Anda."); return; }
+  const btn=document.getElementById("forgotBtn"); btn.disabled=true;
+  const {ok,data}=await apiPost("/api/forgot-password",{email});
+  btn.disabled=false;
+  if(!ok){ toast(data.error||"Gagal mengirim permintaan."); return; }
+  document.getElementById("forgotEmail").value="";
+  toast(data.message);
+}
+async function doResetPassword(){
+  const token=new URLSearchParams(location.search).get("token")||"";
+  const password=document.getElementById("resetPass").value;
+  const confirmPass=document.getElementById("resetPassConfirm").value;
+  if(!token){ toast("Link reset tidak valid. Minta link baru."); return; }
+  if(password.length<8){ toast("Kata sandi minimal 8 karakter."); return; }
+  if(password!==confirmPass){ toast("Konfirmasi kata sandi tidak cocok."); return; }
+  const btn=document.getElementById("resetBtn"); btn.disabled=true;
+  const {ok,data}=await apiPost("/api/reset-password",{token,password});
+  btn.disabled=false;
+  if(!ok){ toast(data.error||"Gagal mengubah kata sandi."); return; }
+  toast("Kata sandi berhasil diubah. Silakan masuk.");
+  setTimeout(()=>go("login"),1200);
+}
+
+/* ---------- CETAK LABEL PENGIRIMAN (admin) ---------- */
+function printLabel(id){
+  const o=(adminOrdersList||[]).find(x=>x.id===id); if(!o||!o.recipient){ toast("Data pesanan tidak ditemukan."); return; }
+  const r=o.recipient;
+  const w=window.open("","_blank","width=640,height=760"); if(!w){ toast("Izinkan pop-up untuk mencetak label."); return; }
+  w.document.write(`<!DOCTYPE html><html lang="id"><head><meta charset="UTF-8"><title>Label Pengiriman ${esc(o.id)}</title>
+    <style>body{font-family:Arial,sans-serif;margin:24px}.box{border:2px solid #000;padding:18px;max-width:520px}
+    h2{margin:0 0 4px}.row{margin:14px 0}.lbl{font-size:11px;text-transform:uppercase;color:#555}
+    .big{font-size:20px;font-weight:700}table{width:100%;border-collapse:collapse;font-size:13px}td{padding:3px 0}</style></head><body>
+    <div class="box"><h2>Homey Wood</h2><div style="font-size:12px;color:#555">Label Pengiriman · ${esc(o.id)} · ${esc(o.date)}</div><hr>
+    <div class="row"><div class="lbl">Penerima</div><div class="big">${esc(r.name)}</div><div>${esc(r.phone)}</div></div>
+    <div class="row"><div class="lbl">Alamat</div><div>${esc(r.address)}</div></div>
+    <div class="row"><div class="lbl">Isi paket</div><table>${o.items.map(i=>`<tr><td>${esc(i.name)}</td><td style="text-align:right">x${i.qty}</td></tr>`).join("")}</table></div>
+    <div class="row"><div class="lbl">Pembayaran</div><div>${esc(o.payment||"")}</div></div></div>
+    <script>window.onload=function(){window.print();}<\/script></body></html>`);
+  w.document.close();
 }
 
 /* ---------- NAVIGASI ANTAR FILE ---------- */

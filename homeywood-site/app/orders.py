@@ -103,6 +103,12 @@ def order_to_dict(order):
         "proof": proof_url,
         "status": STATUS_LABELS.get(order.status, order.status),
         "date": format_tanggal_id(order.created_at),
+        # data penerima untuk label pengiriman (nama LENGKAP, bukan username)
+        "recipient": {
+            "name": order.recipient_name or (order.user.full_name if order.user else ""),
+            "phone": order.recipient_phone or (order.user.phone if order.user else "") or "",
+            "address": order.shipping_address,
+        },
     }
 
 
@@ -173,6 +179,8 @@ def create_order():
         user_id=current_user.id,
         total_amount=total,
         shipping_address=current_user.address or "-",
+        recipient_name=current_user.full_name,    # nama lengkap untuk label pengiriman
+        recipient_phone=current_user.phone,
         payment_label=payment_label,
         status="diproses" if is_cod else "menunggu_verifikasi",
     )
@@ -202,7 +210,7 @@ def create_order():
 def admin_order_to_dict(order):
     d = order_to_dict(order)
     buyer = order.user
-    d["buyer"] = {"id": buyer.id, "name": buyer.full_name, "email": buyer.email} if buyer else None
+    d["buyer"] = {"id": buyer.id, "name": buyer.full_name, "username": buyer.username, "email": buyer.email} if buyer else None
     return d
 
 

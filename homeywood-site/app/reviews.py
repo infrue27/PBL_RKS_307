@@ -29,7 +29,7 @@ MAX_COMMENT = 200
 
 def comment_to_dict(c):
     return {
-        "name": c.user.full_name if c.user else "Pengguna",
+        "name": c.user.username if c.user else "Pengguna",
         "isAdmin": bool(c.user and c.user.role == "admin"),  # ditampilkan sebagai "Penjual"
         "text": c.comment,
         "date": format_tanggal_id(c.created_at),
@@ -39,7 +39,7 @@ def comment_to_dict(c):
 def review_to_dict(r):
     return {
         "id": r.id,
-        "userName": r.user.full_name if r.user else "Pengguna",
+        "userName": r.user.username if r.user else "Pengguna",
         "rating": r.rating,
         "text": r.comment or "",
         "date": format_tanggal_id(r.created_at),
