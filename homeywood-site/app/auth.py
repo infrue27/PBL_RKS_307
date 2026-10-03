@@ -18,6 +18,7 @@ def user_to_dict(user):
         "full_name": user.full_name,
         "name": user.full_name,
         "username": user.username,
+        "display_name": user.username,   # dipakai untuk tampilan di website
         "email": user.email,
         "phone": user.phone,
         "address": user.address,
