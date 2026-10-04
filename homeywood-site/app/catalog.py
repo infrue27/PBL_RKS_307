@@ -51,7 +51,6 @@ def product_to_dict(p, rating=None):
 
 
 def get_payload():
-    """Tanpa foto frontend kirim JSON; dengan foto kirim multipart/form-data."""
     if request.is_json:
         return request.get_json(silent=True) or {}
     return request.form.to_dict()
@@ -87,7 +86,7 @@ def get_product(product_id):
     return jsonify({"product": product_to_dict(p, rating_data_for([p.id])[p.id])})
 
 
-# ============ Khusus admin: tambah / edit / hapus produk ============
+# utk admin tambah, edit, hapus produk
 
 @catalog_bp.route("/admin/products", methods=["POST"])
 @admin_required
@@ -113,8 +112,6 @@ def admin_create_product():
         valid = ", ".join(c.name for c in Category.query.all())
         return jsonify({"error": f"Kategori '{category_name}' tidak ditemukan. Pilihan: {valid}"}), 400
 
-    # Foto disimpan paling akhir, setelah semua validasi lolos,
-    # supaya tidak ada file yatim kalau validasi gagal.
     image_path = None
     file = request.files.get("image")
     if file and file.filename:
@@ -170,7 +167,7 @@ def admin_update_product(product_id):
         except (TypeError, ValueError):
             return jsonify({"error": "Stok tidak valid."}), 400
 
-    # Foto: ganti, hapus, atau biarkan. File lama dihapus setelah commit sukses.
+    # utk foto bisa ganti, hapus, atau biarin aja
     old_image = None
     file = request.files.get("image")
     if file and file.filename:
@@ -193,6 +190,6 @@ def admin_update_product(product_id):
 @admin_required
 def admin_delete_product(product_id):
     product = Product.query.get_or_404(product_id)
-    product.is_active = False  # soft delete -- riwayat order_items yang sudah ada tetap aman
+    product.is_active = False
     db.session.commit()
     return jsonify({"ok": True})

@@ -14,8 +14,6 @@ from .models import CartItem, Order, OrderItem, Payment, Product
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/api")
 
-# Aturan ongkir & ukuran barang -- SAMA PERSIS dengan yang di app.js (ZONES, SIZE_UNITS),
-# sengaja dihitung ulang di sini supaya tidak bisa dimanipulasi dari browser.
 ZONES = {
     "batam":   {"name": "Batam", "rate": 150000, "free_min": 5000000},
     "sumatra": {"name": "Sumatra & Kepri lainnya", "rate": 350000, "free_min": 10000000},
@@ -103,7 +101,6 @@ def order_to_dict(order):
         "proof": proof_url,
         "status": STATUS_LABELS.get(order.status, order.status),
         "date": format_tanggal_id(order.created_at),
-        # data penerima untuk label pengiriman (nama LENGKAP, bukan username)
         "recipient": {
             "name": order.recipient_name or (order.user.full_name if order.user else ""),
             "phone": order.recipient_phone or (order.user.phone if order.user else "") or "",
@@ -149,8 +146,6 @@ def create_order():
     if not is_cod and not payment_proof:
         return jsonify({"error": "Lampirkan bukti pembayaran dulu untuk Transfer/QRIS."}), 400
 
-    # Ambil data produk ASLI dari database -- harga/nama dari client TIDAK dipakai,
-    # supaya tidak bisa diakali lewat DevTools.
     resolved = []
     for it in items_in:
         try:
@@ -185,14 +180,14 @@ def create_order():
         status="diproses" if is_cod else "menunggu_verifikasi",
     )
     db.session.add(order)
-    db.session.flush()  # supaya order.id sudah terbentuk sebelum dipakai order_items
+    db.session.flush()
 
     for product, qty in resolved:
         db.session.add(OrderItem(
             order_id=order.id, product_id=product.id, product_name=product.name,
             unit_price=product.price, quantity=qty, subtotal=float(product.price) * qty,
         ))
-        product.stock -= qty  # kurangi stok di transaksi yang sama
+        product.stock -= qty
 
     if not is_cod:
         proof_path = save_payment_proof(payment_proof, order.order_code)
@@ -201,11 +196,11 @@ def create_order():
             return jsonify({"error": "Format bukti pembayaran tidak valid."}), 400
         db.session.add(Payment(order_id=order.id, proof_path=proof_path, status="pending"))
 
-    CartItem.query.filter_by(user_id=current_user.id).delete()  # kosongkan keranjang, satu transaksi dengan pesanan
+    CartItem.query.filter_by(user_id=current_user.id).delete()
     db.session.commit()
     return jsonify({"order": order_to_dict(order)}), 201
 
-# ============ Khusus admin: lihat semua order, verifikasi bayar, kirim ============
+# utk admin bisa lihat order, verifikasi bayar, dan kirim
 
 def admin_order_to_dict(order):
     d = order_to_dict(order)
@@ -242,7 +237,7 @@ def admin_verify_payment(order_code):
         if payment:
             payment.status = "rejected"
             payment.admin_note = (data.get("note") or "").strip() or None
-        for item in order.items:  # order ditolak -> stok yang tadi dikurangi dikembalikan
+        for item in order.items:
             if item.product:
                 item.product.stock += item.quantity
 

@@ -1,15 +1,3 @@
-"""
-Endpoint ulasan, rating, dan komentar.
-
-  GET  /api/products/<id>/reviews     publik, terbaru dulu
-  POST /api/reviews                   body: {orderCode, productId, rating, text, images:[dataURL, ...]}
-  POST /api/reviews/<id>/comments     body: {text}
-
-Aturan yang dijaga di server (bukan di browser):
-  - ulasan hanya dari pembeli asli, untuk pesanan berstatus "selesai"
-  - produknya harus benar-benar ada di pesanan itu
-  - satu produk per pesanan hanya boleh diulas sekali
-"""
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
@@ -30,7 +18,7 @@ MAX_COMMENT = 200
 def comment_to_dict(c):
     return {
         "name": c.user.username if c.user else "Pengguna",
-        "isAdmin": bool(c.user and c.user.role == "admin"),  # ditampilkan sebagai "Penjual"
+        "isAdmin": bool(c.user and c.user.role == "admin"),
         "text": c.comment,
         "date": format_tanggal_id(c.created_at),
     }
@@ -86,7 +74,6 @@ def create_review():
     if not isinstance(images_in, list) or len(images_in) > MAX_REVIEW_IMAGES:
         return jsonify({"error": f"Maksimal {MAX_REVIEW_IMAGES} foto."}), 400
 
-    # Pesanan harus milik user ini -- order orang lain dijawab "tidak ditemukan"
     order = Order.query.filter_by(order_code=order_code, user_id=current_user.id).first()
     if not order:
         return jsonify({"error": "Pesanan tidak ditemukan."}), 404
@@ -97,7 +84,6 @@ def create_review():
     if Review.query.filter_by(order_id=order.id, product_id=product_id).first():
         return jsonify({"error": "Produk ini sudah diulas."}), 409
 
-    # Foto disimpan paling akhir, setelah semua validasi lolos.
     saved = []
     try:
         for d in images_in:
@@ -115,7 +101,7 @@ def create_review():
     db.session.add(review)
     try:
         db.session.commit()
-    except IntegrityError:  # dua klik kirim bersamaan: aturan unik di database menolak yang kedua
+    except IntegrityError:
         db.session.rollback()
         for p in saved:
             delete_upload(p)

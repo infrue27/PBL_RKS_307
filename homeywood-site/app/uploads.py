@@ -1,12 +1,3 @@
-"""
-Helper upload gambar: foto produk, foto profil, dan foto ulasan.
-
-Keamanan:
-- Tipe file ditentukan dari ISI file (magic bytes), bukan dari nama/ekstensi
-  yang dikirim browser, karena nama file bisa dipalsukan.
-- Hanya JPG, PNG, WEBP. SVG sengaja tidak diizinkan (bisa menyisipkan script).
-- Nama file disimpan acak (uuid), jadi nama dari user tidak pernah dipakai.
-"""
 import base64
 import os
 import re
@@ -14,7 +5,7 @@ import uuid
 
 from flask import current_app
 
-MAX_IMAGE_BYTES = 2 * 1024 * 1024  # 2 MB, sama dengan batas di frontend
+MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
 
 def _detect_ext(head):

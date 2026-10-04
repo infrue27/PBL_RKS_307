@@ -1,12 +1,3 @@
-"""
-Endpoint Kelola User (khusus admin).
-
-  GET   /api/admin/users?search=...&status=all|active|inactive
-  PATCH /api/admin/users/<id>/status   body: {"is_active": true/false}
-
-Tidak ada hapus user (sengaja): akun bermasalah cukup dinonaktifkan,
-riwayat order tetap utuh.
-"""
 from flask import Blueprint, jsonify, request
 from flask_login import current_user
 from sqlalchemy import func

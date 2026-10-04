@@ -254,7 +254,7 @@ tr:last-child td{border-bottom:none;}
 }
 
 
-/* ================= FITUR BARU: ulasan, bukti bayar, animasi ================= */
+/* fitur ulasan, bukti bayar, animasi */
 .muted{color:var(--muted);}
 .status-ship{background:#E0EAF5;color:#3A6494;}
 .rating-line{font-size:12.5px;margin-bottom:6px;display:flex;align-items:center;gap:4px;flex-wrap:wrap;}
@@ -263,6 +263,7 @@ tr:last-child td{border-bottom:none;}
 .order-row{flex-wrap:wrap;}
 .order-actions{flex-basis:100%;display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px;padding-top:10px;border-top:1px dashed var(--border);}
 .reviewed{font-size:12.5px;color:var(--ok);font-weight:600;}
+
 /* ulasan */
 .review-summary{display:flex;gap:32px;align-items:center;margin-bottom:14px;}
 .big-rating{text-align:center;min-width:110px;}
@@ -284,6 +285,7 @@ tr:last-child td{border-bottom:none;}
 .comment-form{display:flex;gap:8px;}
 .comment-form input,.zone-select,#rvText{padding:9px 12px;border:1px solid var(--border);border-radius:8px;font:inherit;font-size:13.5px;background:#fff;width:100%;}
 .comment-form input:focus,.zone-select:focus,#rvText:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(193,112,63,.15);}
+
 /* modal */
 .modal-back{position:fixed;inset:0;background:rgba(43,33,26,.5);display:flex;align-items:center;justify-content:center;z-index:1000;padding:16px;animation:fadeIn .2s ease;}
 .modal{background:var(--white);border-radius:14px;padding:24px;width:100%;max-width:440px;animation:pop .28s cubic-bezier(.2,1.2,.4,1);}
@@ -292,6 +294,7 @@ tr:last-child td{border-bottom:none;}
 .star-pick span{font-size:34px;color:#D9CDB8;cursor:pointer;transition:transform .15s,color .15s;line-height:1;}
 .star-pick span:hover{transform:scale(1.25) rotate(-8deg);}
 .star-pick span.on{color:#E0A458;}
+
 /* checkout */
 .zone-label{display:block;font-size:12.5px;color:var(--muted);margin:8px 0 6px;}
 .proof-box{margin-top:14px;padding:14px;border:1.5px dashed var(--border);border-radius:10px;background:var(--cream-2);}
@@ -301,6 +304,7 @@ tr:last-child td{border-bottom:none;}
 .proof-thumb:hover{transform:scale(1.08);}
 .cod-note{margin-top:12px;font-size:13px;color:var(--ok);background:#E1EDE1;padding:10px 12px;border-radius:8px;}
 .shake{animation:shake .5s;}
+
 /* animasi */
 @keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes pop{from{opacity:0;transform:scale(.92) translateY(8px)}to{opacity:1;transform:none}}
@@ -338,7 +342,8 @@ tr:last-child td{border-bottom:none;}
 .rv-gallery{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;}
 .rv-gallery img{width:88px;height:88px;object-fit:cover;border-radius:8px;border:1px solid var(--border);cursor:zoom-in;transition:transform .2s;}
 .rv-gallery img:hover{transform:scale(1.06);}
-/* ================= MOBILE PATCH ================= */
+
+/* MOBILE PATCH */
 html{-webkit-text-size-adjust:100%;}
 body{overflow-x:hidden;}
 body.menu-open{overflow:hidden;}
@@ -379,7 +384,7 @@ a{cursor:pointer;}
   .mobile-menu a.on{color:var(--accent-dark);font-weight:700;}
   .dropdown-menu a,.dropdown-menu button{padding:14px 16px;}
 
-  /* input 16px supaya iOS tidak auto-zoom saat fokus */
+  /* input 16px supaya di iOS tidak auto-zoom saat fokus */
   .form-row input,.form-row select,.form-row textarea,.comment-form input,.zone-select,#rvText{font-size:16px;}
 
   /* target sentuh min ~44px */
@@ -465,7 +470,7 @@ a{cursor:pointer;}
 }
 
 
-/* ---------- Foto produk & avatar (upload) ---------- */
+/* upload foto produk & avatar */
 .thumb,.detail-img,.mini{overflow:hidden;}
 .thumb img,.detail-img img,.mini img{width:100%;height:100%;object-fit:cover;display:block;}
 .avatar{overflow:hidden;flex-shrink:0;}

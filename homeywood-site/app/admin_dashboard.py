@@ -1,11 +1,3 @@
-"""
-Endpoint Dashboard admin.
-
-  GET /api/admin/dashboard
-
-Semua angka dihitung di database (SUM/COUNT), bukan dijumlah di browser,
-jadi tetap cepat dan akurat walau datanya banyak.
-"""
 from flask import Blueprint, jsonify
 from sqlalchemy import func
 from sqlalchemy.orm import joinedload
@@ -17,11 +9,6 @@ from .orders import STATUS_LABELS
 
 admin_dashboard_bp = Blueprint("admin_dashboard", __name__, url_prefix="/api")
 
-# Status order yang dihitung sebagai PENDAPATAN. Ubah di sini kalau definisinya
-# mau diganti, misalnya ("selesai",) kalau hanya pesanan yang sudah diterima
-# pembeli yang dianggap pendapatan.
-#   - menunggu_pembayaran / menunggu_verifikasi : uang belum terverifikasi
-#   - ditolak / dibatalkan                      : tidak ada uang masuk
 REVENUE_STATUSES = ("diproses", "dikirim", "selesai")
 
 
@@ -34,7 +21,7 @@ def admin_dashboard():
         .scalar()
     )
     total_orders = Order.query.count()
-    total_products = Product.query.filter_by(is_active=True).count()  # produk yang "dihapus" (soft delete) tidak dihitung
+    total_products = Product.query.filter_by(is_active=True).count()
     total_customers = User.query.filter_by(role="customer").count()
 
     recent = (

@@ -1,4 +1,4 @@
-/* ---------- DATA / DB (localStorage) ---------- */
+/*  DATA / DB (localStorage) */
 const CATS = [
   {key:"Sofa",icon:"🛋️"},{key:"Meja",icon:"🪑"},{key:"Kursi",icon:"💺"},{key:"Lemari",icon:"🚪"}
 ];
@@ -41,7 +41,7 @@ async function fetchProductDetail(id){
 
 const db = {
   products:()=>Object.values(PRODUCTS_CACHE),
-  saveProducts:(p)=>{ /* TODO: belum ada API simpan produk (admin kelola produk) -- ini giliran berikutnya */ },
+  saveProducts:(p)=>{ },
   users:()=>JSON.parse(localStorage.getItem("hw_users")),
   saveUsers:(u)=>localStorage.setItem("hw_users",JSON.stringify(u)),
   orders:()=>JSON.parse(localStorage.getItem("hw_orders")),
@@ -58,13 +58,13 @@ const _ss = (k,d)=>{ try{ const v=sessionStorage.getItem(k); return v===null?d:J
 let currentDetailId = _ss("hw_detailId", null);
 let currentFilterCat = _ss("hw_filterCat", "Semua");
 
-/* ---------- SESI (dari backend, bukan localStorage lagi) ---------- */
+/* SESI (dari backend, bukan localStorage lagi) */
 let _authUser = null; // diisi refreshAuth() saat boot() dan tiap habis login/register/logout
 
 function currentUser(){
   return _authUser;
 }
-// Nama yang tampil di website = username. Nama lengkap hanya untuk label/pengiriman.
+
 function displayName(u){ return (u && (u.username||u.name)) || ""; }
 
 async function refreshAuth(){
@@ -93,7 +93,7 @@ function toast(msg){
   window._toastTimer=setTimeout(()=>t.style.display="none",2200);
 }
 
-/* ---------- NAV / ROUTER ---------- */
+/* NAV / ROUTER */
 function showPage(page){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
   const el = document.getElementById("page-"+page);
@@ -191,11 +191,11 @@ function adminHeaderHTML(title,subtitle){
     </div>`;
 }
 
-/* ---------- AUTH ---------- */
+/* AUTH */
 async function apiRequest(method, url, body){
   const opts = { method, headers: {} };
   if(body instanceof FormData){
-    opts.body = body; // upload file: biarkan browser yang mengisi Content-Type (multipart)
+    opts.body = body; // upload file, biarkan browser yang mengisi Content-Type (multipart)
   } else if(body !== undefined){
     opts.headers["Content-Type"] = "application/json";
     opts.body = JSON.stringify(body);
@@ -232,9 +232,6 @@ async function doRegister(){
   const passConfirm=document.getElementById("regPassConfirm").value;
   const termsOk=document.getElementById("regTerms").checked;
 
-  // Validasi ringan di sisi tampilan dulu (respons cepat, hemat request).
-  // Validasi yang menentukan tetap di backend (lihat app/auth.py) -- jangan
-  // pernah percaya validasi di browser saja, karena bisa dilewati.
   if(!full_name||!username||!email||!phone||!address||!password||!passConfirm){toast("Lengkapi semua data terlebih dahulu.");return;}
   if(password.length<8){toast("Kata sandi minimal 8 karakter.");return;}
   if(password!==passConfirm){toast("Konfirmasi kata sandi tidak cocok.");return;}
@@ -262,7 +259,7 @@ function requireLogin(){
   return true;
 }
 
-/* ---------- HELPER: ESCAPE, RATING, STATUS ---------- */
+/* HELPER: ESCAPE, RATING, STATUS */
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 function todayStr(){ return new Date().toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric"}); }
 function ratingStatsFrom(rs){ const n=rs.length; const avg=n? rs.reduce((t,r)=>t+r.rating,0)/n : 0; return {n,avg,rs}; }
@@ -270,7 +267,7 @@ function ratingOf(p){ const r=p.rating||{}; return {n:r.count||0, avg:r.avg||0, 
 function starsHTML(v){ const f=Math.round(v); return '<span class="stars">'+"★".repeat(f)+'<span style="color:#D9CDB8">'+"★".repeat(5-f)+'</span></span>'; }
 function statusClass(st){ return st==="Selesai"?"status-done":st==="Ditolak"?"status-rejected":(st==="Dikirim"||st==="Diproses")?"status-ship":"status-pending"; }
 
-/* ---------- ULASAN, RATING & KOMENTAR ---------- */
+/* ULASAN, RATING & KOMENTAR */
 async function renderReviews(p){
   let box=document.getElementById("reviewSection");
   if(!box){ box=document.createElement("div"); box.id="reviewSection"; document.getElementById("detailWrap").insertAdjacentElement("afterend",box); }
@@ -364,7 +361,7 @@ function orderActionsHTML(o){
   return h? `<div class="order-actions">${h}</div>` : "";
 }
 
-/* ---------- HOME ---------- */
+/* HOME */
 function productCardHTML(p){
   const st=ratingOf(p);
   const last=st.latest;
@@ -394,7 +391,7 @@ async function renderHome(){
 }
 function goToKatalogCat(cat){ currentFilterCat=cat; sessionStorage.setItem("hw_filterCat",JSON.stringify(cat)); go("katalog"); }
 
-/* ---------- KATALOG ---------- */
+/* KATALOG */
 async function renderKatalog(){
   const checked = document.querySelector('input[name="fcat"]:checked');
   const cat = checked ? checked.value : currentFilterCat;
@@ -405,7 +402,7 @@ async function renderKatalog(){
   document.getElementById("footer-katalog").innerHTML = footerHTML();
 }
 
-/* ---------- DETAIL ---------- */
+/* DETAIL */
 let detailQty=1;
 function openDetail(id){ currentDetailId=id; sessionStorage.setItem("hw_detailId",JSON.stringify(id)); detailQty=1; go("detail"); }
 async function renderDetail(){
@@ -436,8 +433,8 @@ function changeQty(d){
   document.getElementById("qtyVal").textContent=detailQty;
 }
 
-/* ---------- CART ---------- */
-let _cart = []; // cache keranjang dari server, diisi refreshCart() saat halaman dibuka
+/* CART */
+let _cart = [];
 
 async function refreshCart(){
   if(!currentUser()){ _cart=[]; return; }
@@ -473,7 +470,7 @@ function cartTotal(){ return cartWithDetails().reduce((s,i)=>s+i.product.price*i
 
 async function renderCart(){
   if(!requireLogin()) return;
-  await fetchProductList(); // isi cache dulu -- halaman ini bisa dibuka langsung tanpa lewat katalog
+  await fetchProductList();
   const items = cartWithDetails();
   if(items.length===0){
     document.getElementById("cartLayout").innerHTML = `<div class="empty-state" style="grid-column:1/-1"><div>🛒</div>Keranjang Anda masih kosong.<br><br><button class="btn btn-primary" onclick="go('katalog')">Mulai Belanja</button></div>`;
@@ -517,7 +514,7 @@ async function removeFromCart(productId){
   toast("Produk dihapus dari keranjang.");
 }
 
-/* ---------- CHECKOUT ---------- */
+/* CHECKOUT */
 /* Ongkir: atur tarif di sini. Tarif dasar per wilayah, barang besar (sofa/lemari) lebih berat. */
 const ZONES=[
   {key:"batam",name:"Batam",rate:150000,freeMin:5000000},
@@ -672,7 +669,7 @@ async function placeOrder(){
   go("profile");
 }
 
-/* ---------- PROFILE ---------- */
+/* PROFILE */
 let profileEditing=false;
 function toggleProfileEdit(on){ profileEditing=on; renderProfile(); }
 async function saveProfile(){
@@ -762,8 +759,7 @@ async function renderProfile(){
   document.getElementById("footer-profile").innerHTML = footerHTML();
 }
 
-/* ---------- KONTAK ---------- */
-// Nomor WhatsApp toko: format internasional, tanpa "+" dan tanpa 0 di depan (62 = Indonesia)
+/* KONTAK */
 const WA_STORE_NUMBER = "6281270655757";
 
 function submitKontak(){
@@ -784,7 +780,7 @@ function submitKontak(){
   toast("Membuka WhatsApp... tekan Kirim di sana untuk mengirim pesan.");
 }
 
-/* ---------- ADMIN: DASHBOARD ---------- */
+/* ADMIN: DASHBOARD */
 async function renderAdminDashboard(){
   const u=currentUser();
   if(!u||u.role!=="admin"){ toast("Halaman khusus admin."); go("login"); return; }
@@ -810,7 +806,7 @@ async function renderAdminDashboard(){
     : `<tr><td colspan="4" style="text-align:center;color:var(--muted)">Belum ada transaksi.</td></tr>`;
 }
 
-/* ---------- ADMIN: KATALOG ---------- */
+/* ADMIN: KATALOG */
 function showAddProductForm(){ document.getElementById("addProductForm").style.display="block"; editingProductId=null; clearProductForm(); }
 function hideAddProductForm(){ document.getElementById("addProductForm").style.display="none"; }
 function clearProductForm(){
@@ -833,14 +829,14 @@ function clearProductImage(){
   apImage.value=""; removeImageFlag=true; showImagePreview(null);
 }
 let editingProductId=null;
-let adminProductsList=[]; // list terakhir dari server, dipakai editProduct/deleteProduct di bawah
+let adminProductsList=[];
 async function renderAdminKatalog(){
   const u=currentUser();
   if(!u||u.role!=="admin"){ toast("Halaman khusus admin."); go("login"); return; }
   document.getElementById("adminSidebar2").innerHTML = adminSidebarHTML("admin-katalog");
   document.getElementById("adminHeader2").innerHTML = adminHeaderHTML("Kelola Katalog Produk","Portal Pemantauan dan Operasional Furniture Homey Wood");
   document.getElementById("footer-admin-katalog").innerHTML = adminFooterHTML();
-  adminProductsList = await fetchProductList(); // list asli dari server, bukan db.products() -- itu cache lama yang bisa nyangkut data terhapus
+  adminProductsList = await fetchProductList();
   const tbody=document.querySelector("#adminProductTable tbody");
   tbody.innerHTML = adminProductsList.map(p=>`
     <tr>
@@ -867,8 +863,6 @@ function editProduct(id){
 async function saveProduct(){
   const name=apName.value.trim(), cat=apCat.value, price=Number(apPrice.value), stock=Number(apStock.value), desc=apDesc.value.trim();
   if(!name||!price||apStock.value===""){ toast("Lengkapi data produk."); return; }
-  // Tanpa foto -> kirim JSON seperti biasa (backend lama tetap jalan).
-  // Ada foto / hapus foto -> kirim FormData supaya file ikut terkirim.
   const file=apImage.files&&apImage.files[0];
   const wantsRemove=removeImageFlag && editingProductId;
   let payload;
@@ -899,7 +893,7 @@ async function deleteProduct(id){
   renderAdminKatalog();
 }
 
-/* ---------- ADMIN: KELOLA USER ---------- */
+/* ADMIN: KELOLA USER */
 let userSearchTimer=null;
 function onUserSearchInput(){
   clearTimeout(userSearchTimer);
@@ -948,8 +942,8 @@ async function toggleUserActive(id,makeActive){
   loadAdminUsers();
 }
 
-/* ---------- ADMIN: VERIFIKASI ---------- */
-let adminOrdersList=[]; // list terakhir dari server, dipakai verifyOrder/shipOrder/viewProof di bawah
+/* ADMIN: VERIFIKASI */
+let adminOrdersList=[];
 async function renderAdminVerifikasi(){
   const u=currentUser();
   if(!u||u.role!=="admin"){ toast("Halaman khusus admin."); go("login"); return; }
@@ -996,7 +990,7 @@ function viewProof(id){
   document.body.appendChild(m);
 }
 
-/* ---------- FOOTER ---------- */
+/* FOOTER */
 const SOCIAL_ICONS = {
   instagram:'<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="5"/><circle cx="12" cy="12" r="4"/><circle cx="17.2" cy="6.8" r="1"/></svg>',
   facebook:'<svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M14 9h3V5h-3c-2.2 0-4 1.8-4 4v2H8v4h2v6h4v-6h3l1-4h-4v-2c0-.6.4-1 1-1z"/></svg>',
@@ -1044,7 +1038,7 @@ function adminFooterHTML(){
   return `<footer class="admin-footer">© 2026 Homey Wood — Admin Portal. Seluruh hak cipta dilindungi.</footer>`;
 }
 
-/* ---------- LUPA & RESET PASSWORD ---------- */
+/* LUPA & RESET PASSWORD */
 async function doForgotPassword(){
   const email=document.getElementById("forgotEmail").value.trim();
   if(!email){ toast("Isi email Anda."); return; }
@@ -1070,7 +1064,7 @@ async function doResetPassword(){
   setTimeout(()=>go("login"),1200);
 }
 
-/* ---------- CETAK LABEL PENGIRIMAN (admin) ---------- */
+/* CETAK LABEL PENGIRIMAN (admin) */
 function printLabel(id){
   const o=(adminOrdersList||[]).find(x=>x.id===id); if(!o||!o.recipient){ toast("Data pesanan tidak ditemukan."); return; }
   const r=o.recipient;
@@ -1088,17 +1082,15 @@ function printLabel(id){
   w.document.close();
 }
 
-/* ---------- NAVIGASI ANTAR FILE ---------- */
-/* Setiap halaman = 1 file di folder pages/. go('x') membuka pages/x.html */
+/* NAVIGASI ANTAR FILE */
 function go(page){
-  // bawa toast yang sedang tampil ke halaman berikutnya
   if(window._lastToast && Date.now()-window._lastToast.t<2200){
     sessionStorage.setItem("hw_pendingToast",window._lastToast.m);
   }
   location.href = page + ".html";
 }
 
-/* ---------- INIT ---------- */
+/* INIT */
 const NAVBAR_HTML = `<nav class="navbar">
   <div class="container">
     <div class="brand" onclick="go('home')"><span class="dot"></span>Homey Wood</div>
@@ -1123,8 +1115,8 @@ const NAVBAR_HTML = `<nav class="navbar">
   if(page==="katalog"){
     const r=document.querySelector('input[name="fcat"][value="'+currentFilterCat+'"]'); if(r) r.checked=true;
   }
-  await refreshAuth(); // tunggu status login dari server dulu, baru render (halaman butuh tahu siapa yang login)
-  await refreshCart(); // keranjang butuh tahu siapa yang login, jadi urutannya setelah refreshAuth
+  await refreshAuth();
+  await refreshCart();
   showPage(page);
   if(page==="tentang"||page==="kontak") document.getElementById("footer-"+page).innerHTML = footerHTML();
   const pt=sessionStorage.getItem("hw_pendingToast");
@@ -1132,7 +1124,7 @@ const NAVBAR_HTML = `<nav class="navbar">
 })();
 
 
-/* ---------- ANIMASI (scroll reveal, stagger) ---------- */
+/* ANIMASI (scroll reveal, stagger) */
 (function motion(){
   const sel=".pcard,.cat-item,.review-item,.order-row,.kpi,.hero-text,.hero-img,.review-summary,.cart-item";
   const io=("IntersectionObserver" in window) ? new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } }),{threshold:.08}) : null;

@@ -1,14 +1,3 @@
-"""
-Endpoint keranjang belanja (milik user yang sedang login).
-
-  GET    /api/cart                    -> {"items": [{"productId", "qty"}]}
-  POST   /api/cart/items              body: {productId, qty}  (qty DITAMBAHKAN ke yang sudah ada)
-  PUT    /api/cart/items/<product_id> body: {qty}             (qty DIGANTI)
-  DELETE /api/cart/items/<product_id>
-
-Semua endpoint mengembalikan isi keranjang terbaru, jadi frontend tinggal
-menimpa cache-nya. Keranjang dikosongkan saat checkout (lihat orders.py).
-"""
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 from sqlalchemy.exc import IntegrityError
@@ -20,8 +9,6 @@ cart_bp = Blueprint("cart", __name__, url_prefix="/api")
 
 
 def cart_items_payload():
-    # Hanya produk yang masih aktif; produk yang sudah "dihapus" admin
-    # (soft delete) otomatis tidak muncul di keranjang.
     rows = (
         CartItem.query.join(Product, CartItem.product_id == Product.id)
         .filter(CartItem.user_id == current_user.id, Product.is_active.is_(True))
@@ -75,7 +62,6 @@ def add_item():
     try:
         db.session.commit()
     except IntegrityError:
-        # dua klik cepat bersamaan: constraint unik (user_id, product_id) menolak baris ganda
         db.session.rollback()
         return jsonify({"error": "Permintaan bentrok, silakan coba lagi."}), 409
 
@@ -106,7 +92,7 @@ def set_item_qty(product_id):
 @login_required
 def remove_item(product_id):
     item = CartItem.query.filter_by(user_id=current_user.id, product_id=product_id).first()
-    if item:  # kalau sudah tidak ada, anggap berhasil (hasil akhirnya sama)
+    if item:
         db.session.delete(item)
         db.session.commit()
     return jsonify({"items": cart_items_payload()})

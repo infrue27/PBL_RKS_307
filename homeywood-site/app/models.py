@@ -137,9 +137,9 @@ class Order(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id"), nullable=False)
     total_amount = db.Column(db.Numeric(14, 2), nullable=False)
     shipping_address = db.Column(db.Text, nullable=False)
-    recipient_name = db.Column(db.String(100))   # snapshot full_name saat order (untuk label pengiriman)
-    recipient_phone = db.Column(db.String(20))   # snapshot telepon saat order
-    payment_label = db.Column(db.String(100))  # contoh: "Transfer Bank BCA (VA: 39017...)"
+    recipient_name = db.Column(db.String(100))
+    recipient_phone = db.Column(db.String(20))
+    payment_label = db.Column(db.String(100))
     reviews = db.relationship("Review", back_populates="order")
     status = db.Column(db.Enum(*ORDER_STATUSES), nullable=False, default="menunggu_pembayaran")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
@@ -156,8 +156,8 @@ class OrderItem(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="SET NULL"))
-    product_name = db.Column(db.String(150), nullable=False)   # snapshot saat beli
-    unit_price = db.Column(db.Numeric(12, 2), nullable=False)  # snapshot saat beli
+    product_name = db.Column(db.String(150), nullable=False)
+    unit_price = db.Column(db.Numeric(12, 2), nullable=False)
     quantity = db.Column(db.Integer, nullable=False)
     subtotal = db.Column(db.Numeric(14, 2), nullable=False)
 
@@ -186,7 +186,7 @@ class PasswordReset(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    token_hash = db.Column(db.String(64), unique=True, nullable=False)  # SHA-256 dari token
+    token_hash = db.Column(db.String(64), unique=True, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     used_at = db.Column(db.DateTime)
     created_at = db.Column(db.DateTime, server_default=db.func.now())

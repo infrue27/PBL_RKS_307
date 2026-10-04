@@ -1,14 +1,5 @@
-"""
-Endpoint profil milik user yang sedang login.
+# Hanya nama, telepon, dan alamat yang bisa diubah dari sini. Username, email, dan role sengaja tidak bisa diubah (role terutama: jangan sampai user bisa menaikkan dirinya jadi admin lewat request buatan sendiri).
 
-  PUT    /api/profile          body: {full_name, phone, address}
-  POST   /api/profile/avatar   multipart, field: avatar
-  DELETE /api/profile/avatar
-
-Hanya nama, telepon, dan alamat yang bisa diubah dari sini. Username, email,
-dan role sengaja tidak bisa diubah (role terutama: jangan sampai user bisa
-menaikkan dirinya jadi admin lewat request buatan sendiri).
-"""
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 
@@ -55,7 +46,7 @@ def upload_avatar():
     old_path = current_user.avatar_path
     current_user.avatar_path = new_path
     db.session.commit()
-    delete_upload(old_path)  # hapus foto lama setelah yang baru sukses tersimpan
+    delete_upload(old_path)
     return jsonify({"user": user_to_dict(current_user)})
 
 

@@ -1,17 +1,9 @@
-"""
-Reset password lewat email.
+# Alur keamanan reset pw:
+# Token acak 256-bit (secrets.token_urlsafe). Di database HANYA hash SHA-256-nya yang disimpan, token asli cuma ada di link email.
+# Token berlaku RESET_TOKEN_MINUTES menit (default 30) dan sekali pakai.
+# /api/forgot-password SELALU membalas pesan yang sama, ada atau tidak emailnya, supaya orang tidak bisa menebak email siapa yang terdaftar.
+# Meminta token baru menghapus token lama milik user itu.
 
-  POST /api/forgot-password   body: {email}
-  POST /api/reset-password    body: {token, password}
-
-Alur & keamanan:
-- Token acak 256-bit (secrets.token_urlsafe). Di database HANYA hash SHA-256-nya
-  yang disimpan, token asli cuma ada di link email.
-- Token berlaku RESET_TOKEN_MINUTES menit (default 30) dan sekali pakai.
-- /api/forgot-password SELALU membalas pesan yang sama, ada atau tidak emailnya,
-  supaya orang tidak bisa menebak email siapa yang terdaftar.
-- Meminta token baru menghapus token lama milik user itu.
-"""
 import hashlib
 import secrets
 import smtplib
@@ -46,7 +38,7 @@ def _send_email(cfg, to_addr, subject, body):
             if cfg["MAIL_USER"]:
                 smtp.login(cfg["MAIL_USER"], cfg["MAIL_PASSWORD"])
             smtp.send_message(msg)
-    except Exception as e:  # jangan sampai error email bocor ke user
+    except Exception as e:
         print(f"[reset-password] Gagal kirim email ke {to_addr}: {e}")
 
 
@@ -59,7 +51,6 @@ def forgot_password():
 
     user = User.query.filter(db.func.lower(User.email) == email).first()
     if user and user.is_active:
-        # hapus token lama milik user ini, lalu buat yang baru
         PasswordReset.query.filter_by(user_id=user.id).delete()
         token = secrets.token_urlsafe(32)
         minutes = current_app.config["RESET_TOKEN_MINUTES"]
@@ -89,7 +80,6 @@ def forgot_password():
                 daemon=True,
             ).start()
         else:
-            # Mode development: belum ada SMTP, tampilkan link di terminal
             print(f"\n[reset-password] SMTP belum diatur. Link reset untuk {user.email}:\n{link}\n")
 
     return jsonify({"message": GENERIC_MSG})
@@ -116,7 +106,6 @@ def reset_password():
 
     user.set_password(password)
     row.used_at = datetime.utcnow()
-    # token lain milik user ini ikut dihapus
     PasswordReset.query.filter(PasswordReset.user_id == user.id, PasswordReset.id != row.id).delete()
     db.session.commit()
     return jsonify({"ok": True, "message": "Kata sandi berhasil diubah. Silakan masuk."})
