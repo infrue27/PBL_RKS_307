@@ -810,7 +810,7 @@ async function renderAdminDashboard(){
 function showAddProductForm(){ document.getElementById("addProductForm").style.display="block"; editingProductId=null; clearProductForm(); }
 function hideAddProductForm(){ document.getElementById("addProductForm").style.display="none"; }
 function clearProductForm(){
-  apName.value=""; apPrice.value=""; apStock.value=""; apDesc.value=""; apCat.value="Sofa";
+  apName.value=""; apPrice.value=""; apStock.value=""; apDesc.value=""; apCat.value="Sofa"; apMat.value="Kayu Jati";
   apImage.value=""; removeImageFlag=false; showImagePreview(null);
 }
 let removeImageFlag=false;
@@ -843,6 +843,7 @@ async function renderAdminKatalog(){
       <td><div class="mini">${productImgHTML(p)}</div></td>
       <td>${p.name}</td>
       <td>${p.category}</td>
+      <td>${p.material||"-"}</td>
       <td>${fmt(p.price)}</td>
       <td>${p.stock}</td>
       <td>
@@ -856,24 +857,24 @@ function editProduct(id){
   if(!p) return;
   editingProductId=id;
   document.getElementById("addProductForm").style.display="block";
-  apName.value=p.name; apCat.value=p.category; apPrice.value=p.price; apStock.value=p.stock; apDesc.value=p.desc;
+  apName.value=p.name; apCat.value=p.category; apMat.value=p.material||"Kayu Jati"; apPrice.value=p.price; apStock.value=p.stock; apDesc.value=p.desc;
   apImage.value=""; removeImageFlag=false; showImagePreview(p.image||null);
   window.scrollTo(0,0);
 }
 async function saveProduct(){
-  const name=apName.value.trim(), cat=apCat.value, price=Number(apPrice.value), stock=Number(apStock.value), desc=apDesc.value.trim();
+  const name=apName.value.trim(), cat=apCat.value, material=apMat.value, price=Number(apPrice.value), stock=Number(apStock.value), desc=apDesc.value.trim();
   if(!name||!price||apStock.value===""){ toast("Lengkapi data produk."); return; }
   const file=apImage.files&&apImage.files[0];
   const wantsRemove=removeImageFlag && editingProductId;
   let payload;
   if(file || wantsRemove){
     payload=new FormData();
-    payload.append("name",name); payload.append("category",cat);
+    payload.append("name",name); payload.append("category",cat); payload.append("material",material);
     payload.append("price",price); payload.append("stock",stock); payload.append("desc",desc);
     if(file) payload.append("image",file);
     else payload.append("remove_image","1");
   } else {
-    payload={name, category:cat, price, stock, desc};
+    payload={name, category:cat, material, price, stock, desc};
   }
 
   const {ok, data} = editingProductId
