@@ -603,7 +603,9 @@ function renderBankChooser(){
 }
 function renderQrisBox(){
   return `<div class="qris-box">
-      <div class="qris-frame"><div class="qris-placeholder">Kode QRIS<br>segera hadir</div></div>
+      <div class="qris-frame">
+        <img src="/img/qris.jpeg" alt="Kode QRIS" style="max-width: 100%; height: auto;">
+      </div>
       <div style="font-size:12.5px;color:var(--muted);margin-top:10px">Kode QRIS dinamis akan otomatis kedaluwarsa dalam <b id="qrisTimer">10:00</b></div>
     </div>`;
 }
