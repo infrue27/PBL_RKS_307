@@ -603,8 +603,12 @@ function renderBankChooser(){
 }
 function renderQrisBox(){
   return `<div class="qris-box">
+      <div class="qris-merchant">
+        <div class="qris-label">QRIS</div>
+        <div class="qris-name">HOMEYWOOD, BTM KT</div>
+      </div>
       <div class="qris-frame">
-        <img src="/img/qris.jpeg" alt="Kode QRIS" style="max-width: 100%; height: auto;">
+        <img src="/img/qris.jpeg" alt="Kode QRIS Homeywood" class="qris-img">
       </div>
       <div style="font-size:12.5px;color:var(--muted);margin-top:10px">Kode QRIS dinamis akan otomatis kedaluwarsa dalam <b id="qrisTimer">10:00</b></div>
     </div>`;
