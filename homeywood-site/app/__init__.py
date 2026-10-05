@@ -120,6 +120,10 @@ def create_app(config_class=Config):
     def js_files(filename):
         return send_from_directory(os.path.join(BASE_DIR, "js"), filename)
 
+    @app.route("/img/<path:filename>")
+    def img_files(filename):
+        return send_from_directory(os.path.join(BASE_DIR, "img"), filename)
+
     # ---- Menyajikan tiap halaman: /login.html, /register.html, dst ----
     # Ini sengaja pakai ".html" di URL supaya cocok dengan go() di app.js
     # yang menulis location.href = page + ".html"
