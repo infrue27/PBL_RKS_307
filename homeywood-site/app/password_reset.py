@@ -51,9 +51,14 @@ def forgot_password():
 
     user = User.query.filter(db.func.lower(User.email) == email).first()
     if user and user.is_active:
+        minutes = current_app.config["RESET_TOKEN_MINUTES"]
+
+        last = PasswordReset.query.filter_by(user_id=user.id).first()
+        if last and datetime.utcnow() - (last.expires_at - timedelta(minutes=minutes)) < timedelta(seconds=60):
+            return jsonify({"message": GENERIC_MSG})
+
         PasswordReset.query.filter_by(user_id=user.id).delete()
         token = secrets.token_urlsafe(32)
-        minutes = current_app.config["RESET_TOKEN_MINUTES"]
         db.session.add(PasswordReset(
             user_id=user.id,
             token_hash=_hash_token(token),
@@ -61,7 +66,7 @@ def forgot_password():
         ))
         db.session.commit()
 
-        base = (current_app.config.get("APP_BASE_URL") or request.host_url).rstrip("/")
+        base = (current_app.config.get("APP_BASE_URL") or "http://127.0.0.1:5000").rstrip("/")
         link = f"{base}/reset-password.html?token={token}"
         body = (
             f"Halo {user.username},\n\n"
@@ -95,6 +100,8 @@ def reset_password():
         return jsonify({"error": "Link reset tidak valid."}), 400
     if len(password) < 8:
         return jsonify({"error": "Kata sandi minimal 8 karakter."}), 400
+    if len(password) > 128:
+        return jsonify({"error": "Kata sandi maksimal 128 karakter."}), 400
 
     row = PasswordReset.query.filter_by(token_hash=_hash_token(token)).first()
     if not row or row.used_at or row.expires_at < datetime.utcnow():

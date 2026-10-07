@@ -1049,21 +1049,25 @@ function adminFooterHTML(){
 async function doForgotPassword(){
   const email=document.getElementById("forgotEmail").value.trim();
   if(!email){ toast("Isi email Anda."); return; }
-  const btn=document.getElementById("forgotBtn"); btn.disabled=true;
+  const btn=document.getElementById("forgotBtn");
+  btn.disabled=true;
   const {ok,data}=await apiPost("/api/forgot-password",{email});
   btn.disabled=false;
   if(!ok){ toast(data.error||"Gagal mengirim permintaan."); return; }
   document.getElementById("forgotEmail").value="";
-  toast(data.message);
+  toast(data.message||"Jika email terdaftar, link reset sudah dikirim.");
 }
+
 async function doResetPassword(){
-  const token=new URLSearchParams(location.search).get("token")||"";
+  const token=new URLSearchParams(location.search).get("token");
   const password=document.getElementById("resetPass").value;
-  const confirmPass=document.getElementById("resetPassConfirm").value;
-  if(!token){ toast("Link reset tidak valid. Minta link baru."); return; }
+  const passConfirm=document.getElementById("resetPassConfirm").value;
+  if(!token){ toast("Link reset tidak valid. Silakan minta link baru."); return; }
+  if(!password||!passConfirm){ toast("Isi kata sandi baru dan konfirmasinya."); return; }
   if(password.length<8){ toast("Kata sandi minimal 8 karakter."); return; }
-  if(password!==confirmPass){ toast("Konfirmasi kata sandi tidak cocok."); return; }
-  const btn=document.getElementById("resetBtn"); btn.disabled=true;
+  if(password!==passConfirm){ toast("Konfirmasi kata sandi tidak cocok."); return; }
+  const btn=document.getElementById("resetBtn");
+  btn.disabled=true;
   const {ok,data}=await apiPost("/api/reset-password",{token,password});
   btn.disabled=false;
   if(!ok){ toast(data.error||"Gagal mengubah kata sandi."); return; }
