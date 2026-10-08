@@ -79,7 +79,7 @@ def create_qris(order_code):
     order = _get_order(order_code)
     if order.status != "menunggu_pembayaran":
         return jsonify({"error": "Pesanan ini tidak sedang menunggu pembayaran."}), 400
-    if not current_app.config["MIDTRANS_SERVER_KEY"].startswith("SB-"):
+    if not current_app.config["MIDTRANS_SERVER_KEY"].startswith(("SB-Mid-server-", "Mid-server-")):
         return jsonify({"error": "MIDTRANS_SERVER_KEY di .env belum diisi dengan key sandbox (SB-Mid-server-...)."}), 500
 
     # QR yang sama dipakai lagi kalau belum kedaluwarsa (Midtrans menolak order_id ganda)

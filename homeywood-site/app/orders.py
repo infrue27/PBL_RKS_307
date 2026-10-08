@@ -15,7 +15,7 @@ from .models import CartItem, Order, OrderItem, Payment, Product
 orders_bp = Blueprint("orders", __name__, url_prefix="/api")
 
 ZONES = {
-    "batam":   {"name": "Batam", "rate": 150000, "free_min": 5000000},
+    "batam":   {"name": "Batam", "rate": 0, "free_min": 0},
     "sumatra": {"name": "Sumatra & Kepri lainnya", "rate": 350000, "free_min": 10000000},
     "jawa":    {"name": "Jawa", "rate": 500000, "free_min": None},
     "kalsul":  {"name": "Kalimantan & Sulawesi", "rate": 750000, "free_min": None},

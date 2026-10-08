@@ -10,11 +10,19 @@ import smtplib
 import threading
 from datetime import datetime, timedelta
 from email.message import EmailMessage
+from email.utils import formataddr
+from html import escape
 
 from flask import Blueprint, current_app, jsonify, request
 
 from .extensions import db
 from .models import PasswordReset, User
+
+import logging
+import ssl
+from email.utils import formataddr, parseaddr
+
+log = logging.getLogger(__name__)
 
 reset_bp = Blueprint("password_reset", __name__, url_prefix="/api")
 
@@ -24,23 +32,35 @@ GENERIC_MSG = "Jika email tersebut terdaftar, link reset kata sandi sudah dikiri
 def _hash_token(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
+def _reset_email_html(name, link, minutes):
+    name = escape(name)
+    return f"""\
+<div style="font-family:Arial,sans-serif;max-width:480px;margin:0 auto;color:#3b2a1e">
+  <h2 style="color:#8a5a2b;margin-bottom:4px">Homey Wood</h2>
+  <p>Halo {name},</p>
+  <p>Kami menerima permintaan untuk mengatur ulang kata sandi akun Anda. Klik tombol di bawah untuk membuat kata sandi baru. Link berlaku {minutes} menit dan hanya bisa dipakai sekali.</p>
+  <p style="margin:24px 0"><a href="{link}" style="background:#8a5a2b;color:#ffffff;padding:12px 22px;border-radius:6px;text-decoration:none;display:inline-block">Atur Ulang Kata Sandi</a></p>
+  <p style="font-size:13px;color:#6b5a4c">Jika tombol tidak berfungsi, salin link ini ke browser:<br><span style="word-break:break-all">{link}</span></p>
+  <p style="font-size:13px;color:#6b5a4c">Jika Anda tidak merasa memintanya, abaikan email ini. Kata sandi Anda tidak berubah.</p>
+</div>"""
 
-def _send_email(cfg, to_addr, subject, body):
+def _send_email(cfg, to_addr, subject, body, html=None):
     """Kirim email lewat SMTP. Dijalankan di thread terpisah supaya request tidak menunggu."""
     try:
         msg = EmailMessage()
-        msg["From"] = cfg["MAIL_FROM"]
+        msg["From"] = formataddr(("Homey Wood", parseaddr(cfg["MAIL_FROM"])[1]))
         msg["To"] = to_addr
         msg["Subject"] = subject
         msg.set_content(body)
+        if html:
+            msg.add_alternative(html, subtype="html")
         with smtplib.SMTP(cfg["MAIL_HOST"], cfg["MAIL_PORT"], timeout=15) as smtp:
-            smtp.starttls()
+            smtp.starttls(context=ssl.create_default_context())
             if cfg["MAIL_USER"]:
                 smtp.login(cfg["MAIL_USER"], cfg["MAIL_PASSWORD"])
             smtp.send_message(msg)
-    except Exception as e:
-        print(f"[reset-password] Gagal kirim email ke {to_addr}: {e}")
-
+    except Exception:
+        log.exception("[reset-password] Gagal kirim email ke %s", to_addr)
 
 @reset_bp.route("/forgot-password", methods=["POST"])
 def forgot_password():
@@ -76,12 +96,13 @@ def forgot_password():
             "Jika Anda tidak merasa memintanya, abaikan email ini. Kata sandi Anda tidak berubah.\n\n"
             "Homey Wood"
         )
+        html = _reset_email_html(user.username, link, minutes)
         cfg = {k: current_app.config[k] for k in
                ("MAIL_HOST", "MAIL_PORT", "MAIL_USER", "MAIL_PASSWORD", "MAIL_FROM")}
         if cfg["MAIL_HOST"]:
             threading.Thread(
                 target=_send_email,
-                args=(cfg, user.email, "Reset kata sandi Homey Wood", body),
+                args=(cfg, user.email, "Reset kata sandi Homey Wood", body, html),
                 daemon=True,
             ).start()
         else:
