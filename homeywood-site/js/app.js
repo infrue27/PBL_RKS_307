@@ -351,6 +351,7 @@ async function confirmArrived(id){
 }
 function orderActionsHTML(o){
   let h="";
+  if(o.status==="Menunggu Pembayaran" && /QRIS/i.test(o.payment||"")) h+=`<button class="btn btn-primary btn-sm" onclick="payWithQris('${o.id}')">Bayar QRIS sekarang</button>`;
   if(o.status==="Dikirim") h+=`<button class="btn btn-primary btn-sm" onclick="confirmArrived('${o.id}')">📦 Barang Sudah Tiba</button>`;
   if(o.status==="Selesai"){
     h+=o.items.map(i=>{ if(!i.productId) return "";
@@ -577,7 +578,7 @@ function copyVA(){
   const va=getVA(selectedBank);
   navigator.clipboard.writeText(va).then(()=>toast("Nomor VA disalin: "+va)).catch(()=>toast("Nomor VA: "+va));
 }
-function choosePayment(m){ selectedPayment=m; stopQrisTimer(); if(m==="QRIS") startQrisTimer(); renderCheckout(); }
+function choosePayment(m){ selectedPayment=m; stopQrisTimer(); renderCheckout(); }
 function chooseBank(code){ selectedBank=code; renderCheckout(); }
 let qrisInterval=null, qrisSeconds=600;
 function startQrisTimer(){
@@ -607,10 +608,7 @@ function renderQrisBox(){
         <div class="qris-label">QRIS</div>
         <div class="qris-name">HOMEYWOOD, BTM KT</div>
       </div>
-      <div class="qris-frame">
-        <img src="/img/qris.jpeg" alt="Kode QRIS Homeywood" class="qris-img">
-      </div>
-      <div style="font-size:12.5px;color:var(--muted);margin-top:10px">Kode QRIS dinamis akan otomatis kedaluwarsa dalam <b id="qrisTimer">10:00</b></div>
+      <p style="font-size:13px;color:var(--muted);margin:10px 0 0">Kode QRIS dinamis (sesuai total pesanan) muncul setelah kamu klik <b>Buat Pesanan</b>. Bukti pembayaran diunggah setelah QR muncul.</p>
     </div>`;
 }
 async function renderCheckout(){
@@ -635,7 +633,7 @@ async function renderCheckout(){
         </label>`).join("")}
       ${selectedPayment==="Transfer Bank" ? renderBankChooser() : ""}
       ${selectedPayment==="QRIS" ? renderQrisBox() : ""}
-      ${selectedPayment!=="Bayar di Tempat (COD)" ? renderProofBox() : `<p class="cod-note">💵 COD: bayar tunai saat barang tiba. Tidak perlu unggah bukti pembayaran.</p>`}
+      ${selectedPayment==="QRIS" ? "" : selectedPayment!=="Bayar di Tempat (COD)" ? renderProofBox() : `<p class="cod-note">💵 COD: bayar tunai saat barang tiba. Tidak perlu unggah bukti pembayaran.</p>`}
     </div>`;
   const right = `<div class="cart-summary">
       <h3 style="margin-top:0">3. Ringkasan Pesanan</h3>
@@ -647,12 +645,12 @@ async function renderCheckout(){
     </div>`;
   document.getElementById("checkoutLayout").innerHTML = `<div>${left}</div>${right}`;
   document.getElementById("footer-checkout").innerHTML = footerHTML();
-  if(selectedPayment==="QRIS" && !qrisInterval) startQrisTimer();
 }
 async function placeOrder(){
   const items=cartWithDetails();
   const isCOD=selectedPayment==="Bayar di Tempat (COD)";
-  if(!isCOD && !paymentProof){
+  const isQRIS=selectedPayment==="QRIS";
+  if(!isCOD && !isQRIS && !paymentProof){
     toast("Lampirkan bukti pembayaran dulu untuk Transfer/QRIS.");
     const pb=document.querySelector(".proof-box"); if(pb){ pb.classList.add("shake"); pb.scrollIntoView({behavior:"smooth",block:"center"}); setTimeout(()=>pb.classList.remove("shake"),600); }
     return;
@@ -665,14 +663,74 @@ async function placeOrder(){
     zone: selectedZone,
     payment_method: selectedPayment,
     payment_label: paymentLabel,
-    payment_proof: isCOD ? null : paymentProof,
+    payment_proof: (isCOD||isQRIS) ? null : paymentProof,
   };
   const {ok, data} = await apiRequest("POST", "/api/orders", payload);
   if(!ok){ toast(data.error || "Gagal membuat pesanan."); return; }
 
   _cart=[]; updateCartBadge(); stopQrisTimer(); vaCache={}; paymentProof=null;
+  if(isQRIS){ await payWithQris(data.order.id); return; }
   toast(isCOD ? "Pesanan dibuat! Bayar tunai saat barang tiba." : "Pesanan dibuat! Menunggu verifikasi pembayaran.");
   go("profile");
+}
+
+/* QRIS DINAMIS (Midtrans) */
+let qrisPoll=null;
+function closeQris(){ clearInterval(qrisPoll); qrisPoll=null; const m=document.getElementById("qrisModal"); if(m) m.remove(); }
+function handleQrisProof(inp, orderCode){
+  const f=inp.files&&inp.files[0]; if(!f) return;
+  compressImage(f,900,0.72).then(async d=>{
+    const {ok,data}=await apiRequest("POST",`/api/orders/${orderCode}/proof`,{payment_proof:d});
+    if(!ok){ toast(data.error||"Gagal mengunggah bukti."); return; }
+    const prev=document.getElementById("qrisProofPrev");
+    if(prev) prev.innerHTML=`<img class="proof-preview" src="${d}" alt="Bukti pembayaran">`;
+    toast("Bukti pembayaran terlampir.");
+  }).catch(()=>toast("Gagal membaca gambar."));
+}
+async function payWithQris(orderCode){
+  closeQris();
+  const {ok,data}=await apiRequest("POST",`/api/orders/${orderCode}/qris`);
+  if(!ok){ toast(data.error||"Gagal membuat QRIS."); go("profile"); return; }
+  const m=document.createElement("div");
+  m.className="modal-back"; m.id="qrisModal";
+  m.innerHTML=`<div style="background:#fff;border-radius:14px;padding:22px;max-width:440px;width:100%;text-align:center;max-height:90vh;overflow:auto">
+    <h3 style="margin-top:0">Scan QRIS untuk membayar</h3>
+    <img src="${data.qr_url}" alt="Kode QRIS" style="width:240px;max-width:100%">
+    <p>Total: <b>${fmt(data.amount)}</b></p>
+
+    <!-- ===== KHUSUS SIMULASI SANDBOX, hapus blok ini saat production ===== -->
+    <div style="border:1px dashed #c9a227;background:#fffbe8;border-radius:8px;padding:10px;margin:10px 0;font-size:12.5px;text-align:left">
+      <b>Simulasi sandbox:</b> salin URL QR, buka simulator, tempel, lalu klik Scan QR.
+      <div style="word-break:break-all;font-size:11px;margin:6px 0"><code>${data.qr_url}</code></div>
+      <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${data.qr_url}');toast('URL disalin.')">Salin URL</button>
+      <a class="btn btn-outline btn-sm" href="https://simulator.sandbox.midtrans.com/qris/index" target="_blank" rel="noopener">Buka simulator</a>
+    </div>
+    <!-- =============================================================== -->
+
+    <p id="qrisStatusText" style="color:var(--muted)">Menunggu pembayaran...</p>
+    <div class="proof-box">
+      <b>Unggah bukti pembayaran (wajib)</b>
+      <input type="file" accept="image/*" onchange="handleQrisProof(this,'${orderCode}')">
+      <div id="qrisProofPrev"></div>
+    </div>
+    <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="closeQris();go('profile')">Tutup, bayar nanti</button>
+  </div>`;
+  document.body.appendChild(m);
+
+  qrisPoll=setInterval(async ()=>{
+    const r=await fetch(`/api/orders/${orderCode}/qris-status`);
+    if(!r.ok) return;
+    const d=await r.json();
+    const t=document.getElementById("qrisStatusText");
+    if(d.status==="menunggu_verifikasi"){
+      closeQris(); toast("Pembayaran & bukti diterima. Menunggu verifikasi admin."); go("profile");
+    } else if(d.status==="dibatalkan"){
+      closeQris(); toast("QRIS kedaluwarsa, pesanan dibatalkan."); go("profile");
+    } else if(t){
+      if(d.midtrans_status==="settlement" && !d.has_proof) t.innerHTML='<b style="color:#2e7d32">Pembayaran diterima.</b><br>Silakan unggah bukti pembayaran.';
+      else if(d.has_proof) t.textContent="Bukti terunggah. Menunggu pembayaran...";
+    }
+  },3000);
 }
 
 /* PROFILE */

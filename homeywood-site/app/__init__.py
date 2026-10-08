@@ -63,6 +63,9 @@ def create_app(config_class=Config):
     from .orders import orders_bp
     app.register_blueprint(orders_bp)
 
+    from .midtrans import midtrans_bp
+    app.register_blueprint(midtrans_bp)
+
     from .admin_users import admin_users_bp
     app.register_blueprint(admin_users_bp)
 
