@@ -84,7 +84,7 @@ def save_payment_proof(data_url, order_code):
 def order_to_dict(order):
     subtotal = sum(float(i.subtotal) for i in order.items)
     shipping = float(order.total_amount) - subtotal
-    proof_url = f"/uploads/{order.payment.proof_path}" if order.payment else None
+    proof_url = f"/uploads/{order.payment.proof_path}" if order.payment and order.payment.proof_path else None
     reviewed_ids = {r.product_id for r in order.reviews}
     return {
         "id": order.order_code,
@@ -143,7 +143,8 @@ def create_order():
         return jsonify({"error": "Wilayah pengiriman tidak dikenali."}), 400
 
     is_cod = payment_method == "Bayar di Tempat (COD)"
-    if not is_cod and not payment_proof:
+    is_qris = payment_method == "QRIS"   # QRIS dinamis Midtrans: bukti diunggah setelah QR muncul
+    if not is_cod and not is_qris and not payment_proof:
         return jsonify({"error": "Lampirkan bukti pembayaran dulu untuk Transfer/QRIS."}), 400
 
     resolved = []
@@ -177,7 +178,7 @@ def create_order():
         recipient_name=current_user.full_name,    # nama lengkap untuk label pengiriman
         recipient_phone=current_user.phone,
         payment_label=payment_label,
-        status="diproses" if is_cod else "menunggu_verifikasi",
+        status="diproses" if is_cod else ("menunggu_pembayaran" if is_qris else "menunggu_verifikasi"),
     )
     db.session.add(order)
     db.session.flush()
@@ -189,7 +190,7 @@ def create_order():
         ))
         product.stock -= qty
 
-    if not is_cod:
+    if not is_cod and not is_qris:
         proof_path = save_payment_proof(payment_proof, order.order_code)
         if not proof_path:
             db.session.rollback()

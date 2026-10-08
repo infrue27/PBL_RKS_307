@@ -30,5 +30,9 @@ class Config:
     APP_BASE_URL = os.environ.get("APP_BASE_URL", "")
     RESET_TOKEN_MINUTES = int(os.environ.get("RESET_TOKEN_MINUTES", "30"))
 
+    # ---- Midtrans (Sandbox: key berawalan SB-Mid-server-)
+    MIDTRANS_SERVER_KEY = os.environ.get("MIDTRANS_SERVER_KEY", "").strip()
+    MIDTRANS_BASE_URL = os.environ.get("MIDTRANS_BASE_URL", "https://api.sandbox.midtrans.com")
+
     UPLOAD_FOLDER = os.environ.get("UPLOAD_FOLDER", "uploads")
     MAX_CONTENT_LENGTH = 4 * 1024 * 1024

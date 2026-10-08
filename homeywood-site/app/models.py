@@ -170,7 +170,10 @@ class Payment(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="CASCADE"), unique=True, nullable=False)
-    proof_path = db.Column(db.String(255), nullable=False)
+    proof_path = db.Column(db.String(255), nullable=True)   # QRIS: diisi setelah pembeli unggah bukti
+    qr_url = db.Column(db.String(500))
+    qr_expires_at = db.Column(db.DateTime)
+    midtrans_status = db.Column(db.String(30))
     status = db.Column(db.Enum("pending", "approved", "rejected"), nullable=False, default="pending")
     admin_note = db.Column(db.String(255))
     verified_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
