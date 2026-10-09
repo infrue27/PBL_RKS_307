@@ -1133,6 +1133,32 @@ async function doResetPassword(){
   setTimeout(()=>go("login"),1200);
 }
 
+/* Halaman reset-password, periksa link sebelum form ditampilkan */
+async function initResetPage(){
+  const box=document.querySelector("#page-reset-password .auth-form");
+  if(!box) return;
+  box.style.visibility="hidden";
+  const token=new URLSearchParams(location.search).get("token");
+  let valid=false;
+  let message="Halaman ini hanya bisa dibuka lewat link di email reset kata sandi.";
+  if(token){
+    try{
+      const {ok,data}=await apiPost("/api/reset-password/check",{token});
+      valid=ok;
+      if(!ok) message=data.error||"Link reset tidak valid atau sudah kedaluwarsa.";
+    }catch(e){
+      message="Tidak dapat memeriksa link. Periksa koneksi Anda, lalu muat ulang halaman.";
+    }
+  }
+  if(!valid){
+    box.innerHTML=`<h2>Link Tidak Valid</h2>
+      <p class="form-sub">${esc(message)}</p>
+      <button class="btn btn-primary btn-block" onclick="go('lupa-password')">Minta Link Baru</button>
+      <p class="switch-link"><a onclick="go('login')">Kembali ke halaman masuk</a></p>`;
+  }
+  box.style.visibility="visible";
+}
+
 /* CETAK LABEL PENGIRIMAN (admin) */
 function printLabel(id){
   const o=(adminOrdersList||[]).find(x=>x.id===id); if(!o||!o.recipient){ toast("Data pesanan tidak ditemukan."); return; }
@@ -1184,6 +1210,7 @@ const NAVBAR_HTML = `<nav class="navbar">
   if(page==="katalog"){
     const r=document.querySelector('input[name="fcat"][value="'+currentFilterCat+'"]'); if(r) r.checked=true;
   }
+  if(page==="reset-password") initResetPage();
   await refreshAuth();
   await refreshCart();
   showPage(page);

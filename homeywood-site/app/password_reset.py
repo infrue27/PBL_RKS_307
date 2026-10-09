@@ -137,3 +137,18 @@ def reset_password():
     PasswordReset.query.filter(PasswordReset.user_id == user.id, PasswordReset.id != row.id).delete()
     db.session.commit()
     return jsonify({"ok": True, "message": "Kata sandi berhasil diubah. Silakan masuk."})
+
+@reset_bp.route("/reset-password/check", methods=["POST"])
+def check_reset_token():
+    """Dipanggil halaman reset-password.html saat dibuka, untuk memastikan link
+    masih berlaku SEBELUM user mengetik password baru. Tidak mengubah apa pun."""
+    data = request.get_json(silent=True) or {}
+    token = data.get("token")
+    if not isinstance(token, str) or not token.strip():
+        return jsonify({"error": "Link reset tidak valid."}), 400
+
+    row = PasswordReset.query.filter_by(token_hash=_hash_token(token.strip())).first()
+    if (not row or row.used_at or row.expires_at < datetime.utcnow()
+            or not row.user or not row.user.is_active):
+        return jsonify({"error": "Link reset tidak valid atau sudah kedaluwarsa. Silakan minta link baru."}), 400
+    return jsonify({"valid": True})
