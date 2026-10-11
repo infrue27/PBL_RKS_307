@@ -695,7 +695,11 @@ async function payWithQris(orderCode){
   m.className="modal-back"; m.id="qrisModal";
   m.innerHTML=`<div style="background:#fff;border-radius:14px;padding:22px;max-width:440px;width:100%;text-align:center;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">Scan QRIS untuk membayar</h3>
-    <img src="${data.qr_url}" alt="Kode QRIS" style="width:240px;max-width:100%">
+    <div style="display:flex;justify-content:center;margin:8px 0 4px">
+      <div style="background:#fff;padding:10px;border:1px solid #E6DAC6;border-radius:12px;line-height:0">
+        <img src="${data.qr_url}" alt="Kode QRIS" style="display:block;width:240px;max-width:100%;height:auto;margin:0 auto">
+      </div>
+    </div>
     <p>Total: <b>${fmt(data.amount)}</b></p>
 
     <!-- ===== KHUSUS SIMULASI SANDBOX, hapus blok ini saat production ===== -->
@@ -707,30 +711,46 @@ async function payWithQris(orderCode){
     </div>
     <!-- =============================================================== -->
 
-    <p id="qrisStatusText" style="color:var(--muted)">Menunggu pembayaran...</p>
-    <div class="proof-box">
-      <b>Unggah bukti pembayaran (wajib)</b>
-      <input type="file" accept="image/*" onchange="handleQrisProof(this,'${orderCode}')">
-      <div id="qrisProofPrev"></div>
+    <div style="text-align:left;font-size:13.5px;margin:12px 0">
+      <div id="qrisPayStatus" style="color:var(--muted)">⏳ Menunggu pembayaran...</div>
+      <div id="qrisProofStatus" style="color:var(--muted);margin-top:4px">📎 Bukti pembayaran belum diunggah</div>
     </div>
-    <button class="btn btn-outline btn-sm" style="margin-top:10px" onclick="closeQris();go('profile')">Tutup, bayar nanti</button>
-  </div>`;
+    <div class="proof-box" style="text-align:left">
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px">Bukti pembayaran <span style="color:var(--err)">* wajib</span></div>
+      <label class="btn btn-outline btn-sm btn-block" style="cursor:pointer;text-align:center">
+        📷 Pilih foto bukti
+        <input type="file" accept="image/*" hidden onchange="handleQrisProof(this,'${orderCode}')">
+      </label>
+      <div id="qrisProofPrev" style="text-align:center;margin-top:8px"></div>
+      <p class="muted" style="font-size:12px;margin:8px 0 0">Unggah screenshot bukti setelah membayar. Pesanan baru diverifikasi admin setelah pembayaran dan bukti sama-sama diterima.</p>
+    </div>
+    <button class="btn btn-outline btn-block" style="margin-top:12px" onclick="closeQris();go('profile')">Tutup, bayar nanti</button>`;
   document.body.appendChild(m);
 
-  qrisPoll=setInterval(async ()=>{
-    const r=await fetch(`/api/orders/${orderCode}/qris-status`);
-    if(!r.ok) return;
-    const d=await r.json();
-    const t=document.getElementById("qrisStatusText");
-    if(d.status==="menunggu_verifikasi"){
-      closeQris(); toast("Pembayaran & bukti diterima. Menunggu verifikasi admin."); go("profile");
-    } else if(d.status==="dibatalkan"){
-      closeQris(); toast("QRIS kedaluwarsa, pesanan dibatalkan."); go("profile");
-    } else if(t){
-      if(d.midtrans_status==="settlement" && !d.has_proof) t.innerHTML='<b style="color:#2e7d32">Pembayaran diterima.</b><br>Silakan unggah bukti pembayaran.';
-      else if(d.has_proof) t.textContent="Bukti terunggah. Menunggu pembayaran...";
+  async function checkQris(){
+      const r=await fetch(`/api/orders/${orderCode}/qris-status`);
+      if(!r.ok) return;
+      const d=await r.json();
+      if(d.status==="menunggu_verifikasi"){
+        closeQris(); toast("Pembayaran & bukti diterima. Menunggu verifikasi admin."); go("profile"); return;
+      }
+      if(d.status==="dibatalkan"){
+        closeQris(); toast("QRIS kedaluwarsa, pesanan dibatalkan."); go("profile"); return;
+      }
+      const pay=document.getElementById("qrisPayStatus"), pf=document.getElementById("qrisProofStatus");
+      if(pay){
+        pay.innerHTML = d.midtrans_status==="settlement"
+          ? '<b style="color:#2e7d32">✅ Pembayaran diterima</b>'
+          : "⏳ Menunggu pembayaran...";
+      }
+      if(pf){
+        pf.innerHTML = d.has_proof
+          ? '<b style="color:#2e7d32">✅ Bukti pembayaran sudah diunggah</b>'
+          : "📎 Bukti pembayaran belum diunggah";
+      }
     }
-  },3000);
+    checkQris();
+    qrisPoll=setInterval(checkQris,3000);
 }
 
 /* PROFILE */
