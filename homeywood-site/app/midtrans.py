@@ -10,6 +10,7 @@ Alur:
   6. POST /api/midtrans/notification     -> webhook (opsional untuk simulasi lokal).
 """
 import hashlib
+import hmac
 from datetime import datetime, timedelta
 
 import requests
@@ -53,6 +54,14 @@ def apply_status(order, data):
     ts = data.get("transaction_status")
     if not ts:
         return
+    ga = data.get("gross_amount")
+    if ga is not None:
+        try:
+            if int(float(ga)) != int(order.total_amount):
+                current_app.logger.warning("Nominal Midtrans tidak cocok untuk %s", order.order_code)
+                return
+        except (TypeError, ValueError):
+            return
     pay = order.payment
     if pay:
         pay.midtrans_status = ts
@@ -64,7 +73,7 @@ def apply_status(order, data):
         order.status = "dibatalkan"
         if pay:
             pay.status = "rejected"
-        for item in order.items:          # kembalikan stok
+        for item in order.items:
             if item.product:
                 item.product.stock += item.quantity
 
@@ -72,6 +81,9 @@ def apply_status(order, data):
 def _get_order(order_code):
     return Order.query.filter_by(order_code=order_code, user_id=current_user.id).first_or_404()
 
+def _locked(order):
+    return (Order.query.filter_by(id=order.id)
+            .with_for_update().populate_existing().first())
 
 @midtrans_bp.route("/orders/<order_code>/qris", methods=["POST"])
 @login_required
@@ -80,7 +92,8 @@ def create_qris(order_code):
     if order.status != "menunggu_pembayaran":
         return jsonify({"error": "Pesanan ini tidak sedang menunggu pembayaran."}), 400
     if not current_app.config["MIDTRANS_SERVER_KEY"].startswith(("SB-Mid-server-", "Mid-server-")):
-        return jsonify({"error": "MIDTRANS_SERVER_KEY di .env belum diisi dengan key sandbox (SB-Mid-server-...)."}), 500
+        current_app.logger.error("MIDTRANS_SERVER_KEY belum diisi atau formatnya salah")
+        return jsonify({"error": "Pembayaran QRIS sedang tidak tersedia."}), 503
 
     # QR yang sama dipakai lagi kalau belum kedaluwarsa (Midtrans menolak order_id ganda)
     pay = order.payment
@@ -99,8 +112,8 @@ def create_qris(order_code):
         return jsonify({"error": "Tidak bisa menghubungi Midtrans. Coba lagi sebentar."}), 502
 
     if data.get("status_code") not in ("200", "201"):
-        print("MIDTRANS ERROR:", r.status_code, r.text)
-        return jsonify({"error": str(data.get("status_message") or "Gagal membuat QRIS.")}), 502
+        current_app.logger.error("Midtrans error %s: %s", r.status_code, r.text[:300])
+        return jsonify({"error": "Gagal membuat QRIS. Silakan coba lagi atau pilih metode pembayaran lain."}), 502
 
     qr_url = next((a["url"] for a in data.get("actions", [])
                    if a["name"].startswith("generate-qr-code")), None)
@@ -122,12 +135,16 @@ def create_qris(order_code):
 def qris_status(order_code):
     order = _get_order(order_code)
     if order.status == "menunggu_pembayaran" and order.payment and order.payment.qr_url:
+        info = None
         try:
-            r = requests.get(f"{_base()}/v2/{order.order_code}/status", auth=_auth(), timeout=20)
-            apply_status(order, r.json())
-            db.session.commit()
+            r = requests.get(f"{_base()}/v2/{order.order_code}/status", auth=_auth(), timeout=8)
+            info = r.json()
         except (requests.RequestException, ValueError):
             pass   # coba lagi pada polling berikutnya
+        if isinstance(info, dict):
+            order = _locked(order)
+            apply_status(order, info)
+            db.session.commit()
     pay = order.payment
     return jsonify({
         "status": order.status,
@@ -154,12 +171,16 @@ def upload_qris_proof(order_code):
 
 @midtrans_bp.route("/midtrans/notification", methods=["POST"])
 def notification():
-    n = request.get_json(silent=True) or {}
+    n = request.get_json(silent=True)
+    if not isinstance(n, dict):
+        return "bad request", 400
     raw = (str(n.get("order_id", "")) + str(n.get("status_code", "")) + str(n.get("gross_amount", ""))
            + current_app.config["MIDTRANS_SERVER_KEY"])
-    if hashlib.sha512(raw.encode()).hexdigest() != n.get("signature_key"):
+    expected = hashlib.sha512(raw.encode()).hexdigest()
+    if not hmac.compare_digest(expected.encode(), str(n.get("signature_key", "")).encode()):
         return "invalid signature", 403
-    order = Order.query.filter_by(order_code=n.get("order_id")).first()
+    order = (Order.query.filter_by(order_code=str(n.get("order_id", "")))
+             .with_for_update().first())
     if order:
         apply_status(order, n)
         db.session.commit()

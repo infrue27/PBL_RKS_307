@@ -3,6 +3,8 @@ import os
 import random
 import re
 import string
+import secrets
+from decimal import Decimal
 from datetime import datetime
 
 from flask import Blueprint, current_app, jsonify, request
@@ -21,6 +23,7 @@ ZONES = {
     "kalsul":  {"name": "Kalimantan & Sulawesi", "rate": 750000, "free_min": None},
     "timur":   {"name": "Bali, NTB/NTT, Maluku & Papua", "rate": 1000000, "free_min": None},
 }
+VALID_METHODS = {"Transfer Bank", "QRIS", "Bayar di Tempat (COD)"}
 SIZE_UNITS = {"Sofa": 3, "Lemari": 3, "Meja": 2, "Kursi": 1}
 
 STATUS_LABELS = {
@@ -57,28 +60,60 @@ def calc_shipping(items_with_products, zone_key):
 
 def gen_order_code():
     for _ in range(20):
-        code = "HW" + datetime.utcnow().strftime("%y%m%d") + "-" + "".join(random.choices(string.digits, k=4))
+        suffix = "".join(secrets.choice(string.digits) for _ in range(6))
+        code = "HW" + datetime.utcnow().strftime("%y%m%d") + "-" + suffix
         if not Order.query.filter_by(order_code=code).first():
             return code
     raise RuntimeError("Gagal membuat kode pesanan unik, coba lagi.")
 
 
-def save_payment_proof(data_url, order_code):
-    m = re.match(r"^data:image/(\w+);base64,(.+)$", data_url or "")
+PROOF_EXT = {"jpeg": "jpg", "jpg": "jpg", "png": "png", "webp": "webp"}
+MAX_PROOF_BYTES = 3 * 1024 * 1024
+
+
+def _looks_like(ext, raw):
+    if ext == "jpg":
+        return raw.startswith(b"\xff\xd8\xff")
+    if ext == "png":
+        return raw.startswith(b"\x89PNG\r\n\x1a\n")
+    if ext == "webp":
+        return raw[:4] == b"RIFF" and raw[8:12] == b"WEBP"
+    return False
+
+
+def decode_payment_proof(data_url):
+    """Validasi bukti bayar tanpa menyentuh disk. Return (ext, bytes) atau None."""
+    if not isinstance(data_url, str):
+        return None
+    m = re.fullmatch(r"data:image/([a-zA-Z]+);base64,([A-Za-z0-9+/]+={0,2})", data_url)
     if not m:
         return None
-    ext, b64 = m.groups()
-    ext = "jpg" if ext in ("jpeg", "jpg") else ext
+    ext = PROOF_EXT.get(m.group(1).lower())
+    if not ext:
+        return None
     try:
-        raw = base64.b64decode(b64)
+        raw = base64.b64decode(m.group(2), validate=True)
     except Exception:
         return None
+    if len(raw) > MAX_PROOF_BYTES or not _looks_like(ext, raw):
+        return None
+    return ext, raw
+
+
+def write_payment_proof(ext, raw, order_code):
     folder = os.path.join(current_app.config["UPLOAD_ROOT"], "payment_proofs")
     os.makedirs(folder, exist_ok=True)
     filename = f"{order_code}.{ext}"
     with open(os.path.join(folder, filename), "wb") as f:
         f.write(raw)
     return f"payment_proofs/{filename}"
+
+
+def save_payment_proof(data_url, order_code):
+    decoded = decode_payment_proof(data_url)
+    if not decoded:
+        return None
+    return write_payment_proof(decoded[0], decoded[1], order_code)
 
 
 def order_to_dict(order):
@@ -119,7 +154,7 @@ def list_orders():
 @orders_bp.route("/orders/<order_code>/confirm-arrived", methods=["POST"])
 @login_required
 def confirm_arrived(order_code):
-    order = Order.query.filter_by(order_code=order_code, user_id=current_user.id).first_or_404()
+    order = Order.query.filter_by(order_code=order_code, user_id=current_user.id).with_for_update().first_or_404()
     if order.status != "dikirim":
         return jsonify({"error": f"Order berstatus '{STATUS_LABELS.get(order.status, order.status)}', belum bisa dikonfirmasi."}), 400
     order.status = "selesai"
@@ -130,52 +165,70 @@ def confirm_arrived(order_code):
 @orders_bp.route("/orders", methods=["POST"])
 @login_required
 def create_order():
-    data = request.get_json(silent=True) or {}
-    items_in = data.get("items") or []
-    zone_key = data.get("zone") or "batam"
-    payment_method = data.get("payment_method") or ""
-    payment_label = (data.get("payment_label") or payment_method or "").strip()
-    payment_proof = data.get("payment_proof")
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return jsonify({"error": "Permintaan tidak valid."}), 400
 
-    if not items_in:
+    items_in = data.get("items")
+    zone_key = data.get("zone") or "batam"
+    payment_method = data.get("payment_method")
+
+    if not isinstance(items_in, list) or not items_in:
         return jsonify({"error": "Keranjang kosong."}), 400
     if zone_key not in ZONES:
         return jsonify({"error": "Wilayah pengiriman tidak dikenali."}), 400
+    if payment_method not in VALID_METHODS:
+        return jsonify({"error": "Metode pembayaran tidak dikenali."}), 400
 
     is_cod = payment_method == "Bayar di Tempat (COD)"
-    is_qris = payment_method == "QRIS"   # QRIS dinamis Midtrans: bukti diunggah setelah QR muncul
-    if not is_cod and not is_qris and not payment_proof:
-        return jsonify({"error": "Lampirkan bukti pembayaran dulu untuk Transfer/QRIS."}), 400
+    is_qris = payment_method == "QRIS"
+
+    payment_label = payment_method
+    if payment_method == "Transfer Bank":
+        client_label = str(data.get("payment_label") or "").strip()
+        if client_label.startswith("Transfer Bank "):
+            payment_label = client_label[:100]
+
+    proof = None
+    if not is_cod and not is_qris:
+        if not data.get("payment_proof"):
+            return jsonify({"error": "Lampirkan bukti pembayaran dulu untuk Transfer/QRIS."}), 400
+        proof = decode_payment_proof(data.get("payment_proof"))
+        if not proof:
+            return jsonify({"error": "Bukti pembayaran tidak valid (JPG/PNG/WebP, maksimal 3 MB)."}), 400
+
+    merged = {}
+    for it in items_in:
+        if not isinstance(it, dict):
+            return jsonify({"error": "Data keranjang tidak valid."}), 400
+        try:
+            pid, qty = int(it.get("productId")), int(it.get("qty"))
+        except (TypeError, ValueError, OverflowError):
+            return jsonify({"error": "Data keranjang tidak valid."}), 400
+        if qty <= 0 or qty > 1000:
+            return jsonify({"error": "Jumlah barang tidak valid."}), 400
+        merged[pid] = merged.get(pid, 0) + qty
 
     resolved = []
-    for it in items_in:
-        try:
-            pid = int(it.get("productId"))
-            qty = int(it.get("qty"))
-        except (TypeError, ValueError):
-            continue
-        if qty <= 0:
-            continue
+    for pid in sorted(merged):
+        qty = merged[pid]
         product = Product.query.filter_by(id=pid, is_active=True).first()
         if not product:
-            return jsonify({"error": f"Salah satu produk di keranjang sudah tidak tersedia."}), 400
+            return jsonify({"error": "Salah satu produk di keranjang sudah tidak tersedia."}), 400
         if product.stock < qty:
             return jsonify({"error": f"Stok '{product.name}' tidak cukup (tersisa {product.stock})."}), 400
         resolved.append((product, qty))
 
-    if not resolved:
-        return jsonify({"error": "Keranjang kosong."}), 400
-
     zone, shipping_fee = calc_shipping(resolved, zone_key)
-    subtotal = sum(float(p.price) * qty for p, qty in resolved)
-    total = subtotal + shipping_fee
+    subtotal = sum((p.price * qty for p, qty in resolved), Decimal("0"))
+    total = subtotal + Decimal(shipping_fee)
 
     order = Order(
         order_code=gen_order_code(),
         user_id=current_user.id,
         total_amount=total,
         shipping_address=current_user.address or "-",
-        recipient_name=current_user.full_name,    # nama lengkap untuk label pengiriman
+        recipient_name=current_user.full_name,
         recipient_phone=current_user.phone,
         payment_label=payment_label,
         status="diproses" if is_cod else ("menunggu_pembayaran" if is_qris else "menunggu_verifikasi"),
@@ -184,21 +237,35 @@ def create_order():
     db.session.flush()
 
     for product, qty in resolved:
-        db.session.add(OrderItem(
-            order_id=order.id, product_id=product.id, product_name=product.name,
-            unit_price=product.price, quantity=qty, subtotal=float(product.price) * qty,
-        ))
-        product.stock -= qty
-
-    if not is_cod and not is_qris:
-        proof_path = save_payment_proof(payment_proof, order.order_code)
-        if not proof_path:
+        name = product.name
+        updated = (Product.query
+                   .filter(Product.id == product.id, Product.stock >= qty)
+                   .update({Product.stock: Product.stock - qty}, synchronize_session=False))
+        if updated != 1:
             db.session.rollback()
-            return jsonify({"error": "Format bukti pembayaran tidak valid."}), 400
+            return jsonify({"error": f"Stok '{name}' tidak cukup. Silakan muat ulang keranjang."}), 400
+        db.session.add(OrderItem(
+            order_id=order.id, product_id=product.id, product_name=name,
+            unit_price=product.price, quantity=qty, subtotal=product.price * qty,
+        ))
+
+    proof_path = None
+    if proof:
+        proof_path = write_payment_proof(proof[0], proof[1], order.order_code)
         db.session.add(Payment(order_id=order.id, proof_path=proof_path, status="pending"))
 
     CartItem.query.filter_by(user_id=current_user.id).delete()
-    db.session.commit()
+    try:
+        db.session.commit()
+    except Exception:
+        db.session.rollback()
+        if proof_path:
+            try:
+                os.remove(os.path.join(current_app.config["UPLOAD_ROOT"], proof_path))
+            except OSError:
+                pass
+        current_app.logger.exception("Gagal menyimpan pesanan")
+        return jsonify({"error": "Gagal menyimpan pesanan. Silakan coba lagi."}), 500
     return jsonify({"order": order_to_dict(order)}), 201
 
 # utk admin bisa lihat order, verifikasi bayar, dan kirim
@@ -220,7 +287,7 @@ def admin_list_orders():
 @orders_bp.route("/admin/orders/<order_code>/verify", methods=["POST"])
 @admin_required
 def admin_verify_payment(order_code):
-    order = Order.query.filter_by(order_code=order_code).first_or_404()
+    order = Order.query.filter_by(order_code=order_code).with_for_update().first_or_404()
     data = request.get_json(silent=True) or {}
     action = data.get("action")
     if action not in ("approve", "reject"):

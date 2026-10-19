@@ -1,5 +1,4 @@
 -- Migration 006: QRIS dinamis Midtrans
--- Jalankan SEKALI di database homeywood, setelah migration_004 (005 sudah termasuk di schema.sql).
 USE homeywood;
 
 ALTER TABLE payments

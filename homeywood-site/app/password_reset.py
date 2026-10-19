@@ -106,7 +106,11 @@ def forgot_password():
                 daemon=True,
             ).start()
         else:
-            print(f"\n[reset-password] SMTP belum diatur. Link reset untuk {user.email}:\n{link}\n")
+            if current_app.debug:
+                print(f"\n[reset-password] SMTP belum diatur. Link reset untuk {user.email}:\n{link}\n")
+            else:
+                current_app.logger.warning(
+                    "SMTP belum diatur, email reset untuk user_id=%s tidak dikirim", user.id)
 
     return jsonify({"message": GENERIC_MSG})
 

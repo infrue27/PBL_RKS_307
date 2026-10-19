@@ -23,8 +23,8 @@ CREATE TABLE users (
   address       TEXT          NULL,
   password_hash VARCHAR(255)  NOT NULL,
   role          ENUM('admin','customer') NOT NULL DEFAULT 'customer',
-  avatar_path   VARCHAR(255)  NULL,          -- path file avatar hasil upload
-  is_active     TINYINT(1)    NOT NULL DEFAULT 1,   -- admin bisa nonaktifkan akun
+  avatar_path   VARCHAR(255)  NULL,
+  is_active     TINYINT(1)    NOT NULL DEFAULT 1,
   created_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at    DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB;
@@ -47,13 +47,13 @@ CREATE TABLE products (
   price        DECIMAL(12,2) NOT NULL CHECK (price >= 0),
   stock        INT           NOT NULL DEFAULT 0 CHECK (stock >= 0),
   image_path   VARCHAR(255)  NULL,
-  is_active    TINYINT(1)    NOT NULL DEFAULT 1,   -- "hapus" = soft delete, riwayat pesanan aman
+  is_active    TINYINT(1)    NOT NULL DEFAULT 1,
   created_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at   DATETIME      NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   CONSTRAINT fk_products_category FOREIGN KEY (category_id) REFERENCES categories(id),
   INDEX idx_products_category (category_id),
   INDEX idx_products_price (price),
-  FULLTEXT INDEX ft_products_search (name, description)   -- untuk fitur pencarian katalog
+  FULLTEXT INDEX ft_products_search (name, description)
 ) ENGINE=InnoDB;
 
 -- --------------------------------------------------------------------------
@@ -83,7 +83,7 @@ CREATE TABLE cart_items (
   added_at    DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   CONSTRAINT fk_cart_user    FOREIGN KEY (user_id)    REFERENCES users(id)    ON DELETE CASCADE,
   CONSTRAINT fk_cart_product FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE CASCADE,
-  UNIQUE KEY uq_cart_user_product (user_id, product_id)   -- produk sama = tambah quantity, bukan baris baru
+  UNIQUE KEY uq_cart_user_product (user_id, product_id)
 ) ENGINE=InnoDB;
 
 -- --------------------------------------------------------------------------
@@ -93,11 +93,11 @@ CREATE TABLE cart_items (
 -- --------------------------------------------------------------------------
 CREATE TABLE orders (
   id               INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-  order_code       VARCHAR(30)   NOT NULL UNIQUE,      -- contoh: HW-260918-0842
+  order_code       VARCHAR(30)   NOT NULL UNIQUE,
   user_id          INT UNSIGNED  NOT NULL,
   total_amount     DECIMAL(14,2) NOT NULL,
   shipping_address TEXT          NOT NULL,
-  recipient_name   VARCHAR(100)  NULL,                 -- snapshot nama lengkap untuk label pengiriman
+  recipient_name   VARCHAR(100)  NULL,\
   recipient_phone  VARCHAR(20)   NULL,
   status           ENUM('menunggu_pembayaran','menunggu_verifikasi',
                         'diproses','dikirim','selesai','ditolak','dibatalkan')
@@ -113,9 +113,9 @@ CREATE TABLE orders (
 CREATE TABLE order_items (
   id            INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
   order_id      INT UNSIGNED  NOT NULL,
-  product_id    INT UNSIGNED  NULL,                  -- NULL kalau produk dihapus permanen
-  product_name  VARCHAR(150)  NOT NULL,              -- snapshot
-  unit_price    DECIMAL(12,2) NOT NULL,              -- snapshot
+  product_id    INT UNSIGNED  NULL,
+  product_name  VARCHAR(150)  NOT NULL,
+  unit_price    DECIMAL(12,2) NOT NULL,
   quantity      INT UNSIGNED  NOT NULL CHECK (quantity > 0),
   subtotal      DECIMAL(14,2) NOT NULL,
   CONSTRAINT fk_items_order   FOREIGN KEY (order_id)   REFERENCES orders(id)   ON DELETE CASCADE,

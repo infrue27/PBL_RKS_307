@@ -1,21 +1,6 @@
-/*  DATA / DB (localStorage) */
 const CATS = [
   {key:"Sofa",icon:"🛋️"},{key:"Meja",icon:"🪑"},{key:"Kursi",icon:"💺"},{key:"Lemari",icon:"🚪"}
 ];
-
-function seedIfEmpty(){
-  if(!localStorage.getItem("hw_users")){
-    const users = [
-      {id:1,name:"Admin Homey Wood",username:"admin",email:"admin@homeywood.com",phone:"081200000000",address:"Kantor Pusat Homey Wood, Jakarta",password:"admin123",role:"admin",joined:"01 Januari 2026"}
-    ];
-    localStorage.setItem("hw_users",JSON.stringify(users));
-  }
-  if(!localStorage.getItem("hw_orders")) localStorage.setItem("hw_orders","[]");
-  if(!localStorage.getItem("hw_carts")) localStorage.setItem("hw_carts","{}");
-  if(!localStorage.getItem("hw_messages")) localStorage.setItem("hw_messages","[]");
-  if(!localStorage.getItem("hw_reviews")) localStorage.setItem("hw_reviews","[]");
-}
-seedIfEmpty();
 
 let PRODUCTS_CACHE = {};
 
@@ -40,18 +25,7 @@ async function fetchProductDetail(id){
 }
 
 const db = {
-  products:()=>Object.values(PRODUCTS_CACHE),
-  saveProducts:(p)=>{ },
-  users:()=>JSON.parse(localStorage.getItem("hw_users")),
-  saveUsers:(u)=>localStorage.setItem("hw_users",JSON.stringify(u)),
-  orders:()=>JSON.parse(localStorage.getItem("hw_orders")),
-  saveOrders:(o)=>localStorage.setItem("hw_orders",JSON.stringify(o)),
-  carts:()=>JSON.parse(localStorage.getItem("hw_carts")),
-  saveCarts:(c)=>localStorage.setItem("hw_carts",JSON.stringify(c)),
-  messages:()=>JSON.parse(localStorage.getItem("hw_messages")),
-  saveMessages:(m)=>localStorage.setItem("hw_messages",JSON.stringify(m)),
-  reviews:()=>JSON.parse(localStorage.getItem("hw_reviews")||"[]"),
-  saveReviews:(r)=>localStorage.setItem("hw_reviews",JSON.stringify(r))
+  products:()=>Object.values(PRODUCTS_CACHE)
 };
 
 const _ss = (k,d)=>{ try{ const v=sessionStorage.getItem(k); return v===null?d:JSON.parse(v);}catch(e){return d;} };
@@ -289,7 +263,7 @@ function reviewHTML(r){
     <div class="review-head"><div class="avatar-sm">${esc(r.userName.charAt(0).toUpperCase())}</div>
       <div><b>${esc(r.userName)}</b><div>${starsHTML(r.rating)} <span class="muted" style="font-size:12px">${esc(r.date)}</span></div></div></div>
     <p class="review-text">${esc(r.text)}</p>
-    ${(r.images&&r.images.length)?`<div class="rv-gallery">${r.images.map(d=>`<img src="${d}" onclick="viewImage(this.src)">`).join("")}</div>`:""}
+    ${(r.images&&r.images.length)?`<div class="rv-gallery">${r.images.map(d=>`<img src="${esc(d)}" onclick="viewImage(this.src)">`).join("")}</div>`:""}
     <div class="comments">${cs}</div>
     <div class="comment-form"><input id="cm-${r.id}" placeholder="Tulis komentar..." maxlength="200" onkeydown="if(event.key==='Enter')addComment('${r.id}')"><button class="btn btn-outline btn-sm" onclick="addComment('${r.id}')">Kirim</button></div>
   </div>`;
@@ -369,7 +343,7 @@ function productCardHTML(p){
   return `<div class="pcard" onclick="openDetail(${p.id})">
     <div class="thumb">${productImgHTML(p)}</div>
     <div class="info">
-      <div class="name">${p.name}</div>
+      <div class="name">${esc(p.name)}</div>
       <div class="price">${fmt(p.price)}</div>
       <div class="rating-line">${st.n ? starsHTML(st.avg)+` <b>${st.avg.toFixed(1)}</b> <span class="muted">(${st.n} ulasan)</span>` : `<span class="muted">Belum ada ulasan</span>`}</div>
       ${last ? `<div class="review-snippet">"${esc(last.text)}"${last.hasImages?" 📷":""} <span>— ${esc(last.userName)}</span></div>` : ""}
@@ -414,9 +388,9 @@ async function renderDetail(){
     <div class="detail-img">${productImgHTML(p)}</div>
     <div class="detail-info">
       <div>${st.n ? starsHTML(st.avg)+` <span style="color:var(--muted);font-size:13px">${st.avg.toFixed(1)} · ${st.n} ulasan</span>` : `<span style="color:var(--muted);font-size:13px">Belum ada ulasan</span>`}</div>
-      <h1>${p.name}</h1>
+      <h1>${esc(p.name)}</h1>
       <div class="price">${fmt(p.price)}</div>
-      <p style="color:var(--muted);font-size:14px;line-height:1.7">${p.desc}</p>
+      <p style="color:var(--muted);font-size:14px;line-height:1.7">${esc(p.desc)}</p>
       <p style="font-size:13px;color:var(--muted)">Stok tersedia: ${p.stock}</p>
       <div class="qty-row">
         <div class="qty-box">
@@ -482,7 +456,7 @@ async function renderCart(){
     <div class="cart-item">
       <div class="thumb">${productImgHTML(i.product)}</div>
       <div class="info">
-        <div class="name">${i.product.name}</div>
+        <div class="name">${esc(i.product.name)}</div>
         <div class="price">${fmt(i.product.price)}</div>
       </div>
       <div class="qty-box">
@@ -637,7 +611,7 @@ async function renderCheckout(){
     </div>`;
   const right = `<div class="cart-summary">
       <h3 style="margin-top:0">3. Ringkasan Pesanan</h3>
-      ${items.map(i=>`<div class="sum-row"><span>${i.product.name} x${i.qty}</span><span>${fmt(i.product.price*i.qty)}</span></div>`).join("")}
+      ${items.map(i=>`<div class="sum-row"><span>${esc(i.product.name)} x${i.qty}</span><span>${fmt(i.product.price*i.qty)}</span></div>`).join("")}
       <div class="sum-row"><span>Subtotal</span><span>${fmt(cartTotal())}</span></div>
       <div class="sum-row"><span>Ongkos Kirim (${ship.zone.name})</span><span>${ship.free?'<b style="color:var(--ok)">Gratis</b>':fmt(ship.fee)}</span></div>
       <div class="sum-row total"><span>Total Bayar</span><span>${fmt(cartTotal()+ship.fee)}</span></div>
@@ -646,7 +620,9 @@ async function renderCheckout(){
   document.getElementById("checkoutLayout").innerHTML = `<div>${left}</div>${right}`;
   document.getElementById("footer-checkout").innerHTML = footerHTML();
 }
+let placingOrder=false;
 async function placeOrder(){
+  if(placingOrder) return;
   const items=cartWithDetails();
   const isCOD=selectedPayment==="Bayar di Tempat (COD)";
   const isQRIS=selectedPayment==="QRIS";
@@ -665,8 +641,16 @@ async function placeOrder(){
     payment_label: paymentLabel,
     payment_proof: (isCOD||isQRIS) ? null : paymentProof,
   };
+  placingOrder=true;
+  const btn=document.querySelector("#checkoutLayout .cart-summary .btn-primary");
+  if(btn){ btn.disabled=true; btn.textContent="Memproses..."; }
   const {ok, data} = await apiRequest("POST", "/api/orders", payload);
-  if(!ok){ toast(data.error || "Gagal membuat pesanan."); return; }
+  if(!ok){
+    placingOrder=false;
+    if(btn){ btn.disabled=false; btn.textContent="Buat Pesanan"; }
+    toast(data.error || "Gagal membuat pesanan.");
+    return;
+  }
 
   _cart=[]; updateCartBadge(); stopQrisTimer(); vaCache={}; paymentProof=null;
   if(isQRIS){ await payWithQris(data.order.id); return; }
@@ -697,7 +681,7 @@ async function payWithQris(orderCode){
     <h3 style="margin-top:0">Scan QRIS untuk membayar</h3>
     <div style="display:flex;justify-content:center;margin:8px 0 4px">
       <div style="background:#fff;padding:10px;border:1px solid #E6DAC6;border-radius:12px;line-height:0">
-        <img src="${data.qr_url}" alt="Kode QRIS" style="display:block;width:240px;max-width:100%;height:auto;margin:0 auto">
+        <img src="${esc(data.qr_url)}" alt="Kode QRIS" style="display:block;width:240px;max-width:100%;height:auto;margin:0 auto">
       </div>
     </div>
     <p>Total: <b>${fmt(data.amount)}</b></p>
@@ -705,8 +689,8 @@ async function payWithQris(orderCode){
     <!-- ===== KHUSUS SIMULASI SANDBOX, hapus blok ini saat production ===== -->
     <div style="border:1px dashed #c9a227;background:#fffbe8;border-radius:8px;padding:10px;margin:10px 0;font-size:12.5px;text-align:left">
       <b>Simulasi sandbox:</b> salin URL QR, buka simulator, tempel, lalu klik Scan QR.
-      <div style="word-break:break-all;font-size:11px;margin:6px 0"><code>${data.qr_url}</code></div>
-      <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${data.qr_url}');toast('URL disalin.')">Salin URL</button>
+      <div style="word-break:break-all;font-size:11px;margin:6px 0"><code>${esc(data.qr_url)}</code></div>
+      <button class="btn btn-outline btn-sm" onclick="navigator.clipboard.writeText('${esc(data.qr_url)}');toast('URL disalin.')">Salin URL</button>
       <a class="btn btn-outline btn-sm" href="https://simulator.sandbox.midtrans.com/qris/index" target="_blank" rel="noopener">Buka simulator</a>
     </div>
     <!-- =============================================================== -->
@@ -805,10 +789,10 @@ async function renderProfile(){
       </div>
       <div class="two-col">
         <div><div style="font-size:12px;color:var(--muted)">Nama Lengkap <span style="font-weight:400">(untuk label pengiriman)</span></div><div style="font-size:14.5px;font-weight:600">${esc(u.name)}</div></div>
-        <div><div style="font-size:12px;color:var(--muted)">Username</div><div style="font-size:14.5px;font-weight:600">${u.username||'-'}</div></div>
-        <div><div style="font-size:12px;color:var(--muted)">Email</div><div style="font-size:14.5px;font-weight:600">${u.email}</div></div>
-        <div><div style="font-size:12px;color:var(--muted)">No. WhatsApp</div><div style="font-size:14.5px;font-weight:600">${u.phone}</div></div>
-        <div><div style="font-size:12px;color:var(--muted)">Alamat</div><div style="font-size:14.5px;font-weight:600">${u.address}</div></div>
+        <div><div style="font-size:12px;color:var(--muted)">Username</div><div style="font-size:14.5px;font-weight:600">${esc(u.username||'-')}</div></div>
+        <div><div style="font-size:12px;color:var(--muted)">Email</div><div style="font-size:14.5px;font-weight:600">${esc(u.email)}</div></div>
+        <div><div style="font-size:12px;color:var(--muted)">No. WhatsApp</div><div style="font-size:14.5px;font-weight:600">${esc(u.phone)}</div></div>
+        <div><div style="font-size:12px;color:var(--muted)">Alamat</div><div style="font-size:14.5px;font-weight:600">${esc(u.address)}</div></div>
       </div>
     </div>`;
   document.getElementById("profileContent").innerHTML = `
@@ -830,7 +814,7 @@ async function renderProfile(){
       <div class="order-row">
         <div>
           <div style="font-weight:600;font-size:14px">${o.id} · ${o.date}</div>
-          <div style="font-size:12.5px;color:var(--muted)">${o.items.map(i=>i.name+" x"+i.qty).join(", ")}</div>
+          <div style="font-size:12.5px;color:var(--muted)">${o.items.map(i=>esc(i.name)+" x"+i.qty).join(", ")}</div>
         </div>
         <div style="text-align:right">
           <div style="font-weight:700;margin-bottom:2px">${fmt(o.total)}</div>
@@ -925,9 +909,9 @@ async function renderAdminKatalog(){
   tbody.innerHTML = adminProductsList.map(p=>`
     <tr>
       <td><div class="mini">${productImgHTML(p)}</div></td>
-      <td>${p.name}</td>
-      <td>${p.category}</td>
-      <td>${p.material||"-"}</td>
+      <td>${esc(p.name)}</td>
+      <td>${esc(p.category)}</td>
+      <td>${esc(p.material||"-")}</td>
       <td>${fmt(p.price)}</td>
       <td>${p.stock}</td>
       <td>

@@ -2,7 +2,6 @@ import os
 
 from flask import Flask, abort, redirect, send_from_directory
 from flask_login import current_user
-from sqlalchemy import text
 
 from config import Config
 from .extensions import db, login_manager
@@ -28,6 +27,10 @@ def create_app(config_class=Config):
     )
     app.config.from_object(config_class)
 
+    if os.environ.get("BEHIND_PROXY") == "1":
+        from werkzeug.middleware.proxy_fix import ProxyFix
+        app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
+
     db.init_app(app)
     login_manager.init_app(app)
 
@@ -44,12 +47,6 @@ def create_app(config_class=Config):
     def unauthorized():
         from flask import jsonify
         return jsonify({"error": "Silakan masuk terlebih dahulu."}), 401
-
-    # ---- SEMENTARA: cek koneksi database. Hapus setelah koneksi terbukti jalan. ----
-    @app.route("/db-check")
-    def db_check():
-        db.session.execute(text("SELECT 1"))
-        return "Koneksi database OK"
 
     from .auth import auth_bp
     app.register_blueprint(auth_bp)

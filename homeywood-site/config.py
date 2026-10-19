@@ -9,6 +9,13 @@ load_dotenv()
 class Config:
     SECRET_KEY = os.environ["SECRET_KEY"]
 
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    SESSION_COOKIE_SECURE = os.environ.get("COOKIE_SECURE") == "1"
+    REMEMBER_COOKIE_HTTPONLY = True
+    REMEMBER_COOKIE_SAMESITE = "Lax"
+    REMEMBER_COOKIE_SECURE = os.environ.get("COOKIE_SECURE") == "1"
+
     # quote_plus supaya password yang mengandung karakter khusus (@, :, /) aman
     SQLALCHEMY_DATABASE_URI = (
         "mysql+pymysql://"
