@@ -998,9 +998,10 @@ async function loadAdminUsers(){
       <td>${esc(x.joined)||'-'}</td>
       <td>${x.order_count}</td>
       <td><span class="status-pill ${x.is_active?'status-done':'status-rejected'}">${x.is_active?'Aktif':'Nonaktif'}</span></td>
-      <td>${x.is_active
+      <td><div class="user-actions">${x.is_active
         ? `<button class="btn btn-danger btn-sm" onclick="toggleUserActive(${x.id},false)">Nonaktifkan</button>`
-        : `<button class="btn btn-primary btn-sm" onclick="toggleUserActive(${x.id},true)">Aktifkan</button>`}</td>
+        : `<button class="btn btn-primary btn-sm" onclick="toggleUserActive(${x.id},true)">Aktifkan</button>`}
+        <button class="btn btn-danger btn-sm" onclick="deleteUser(${x.id})">Hapus</button></div></td>
     </tr>`).join("") : `<tr><td colspan="8" style="text-align:center;color:var(--muted)">Tidak ada pengguna yang cocok.</td></tr>`;
 }
 async function toggleUserActive(id,makeActive){
@@ -1008,6 +1009,14 @@ async function toggleUserActive(id,makeActive){
   const {ok,data}=await apiRequest("PATCH",`/api/admin/users/${id}/status`,{is_active:makeActive});
   if(!ok){ toast(data.error||"Gagal mengubah status akun."); return; }
   toast(makeActive?"Akun diaktifkan.":"Akun dinonaktifkan.");
+  loadAdminUsers();
+}
+
+async function deleteUser(id){
+  if(!confirm("Hapus akun ini secara permanen? Tindakan ini tidak bisa dibatalkan.")) return;
+  const {ok,data}=await apiRequest("DELETE",`/api/admin/users/${id}`);
+  if(!ok){ toast(data.error||"Gagal menghapus akun."); return; }
+  toast("Akun dihapus.");
   loadAdminUsers();
 }
 
@@ -1034,12 +1043,22 @@ async function renderAdminVerifikasi(){
       <div style="text-align:right"><div style="font-weight:700;margin-bottom:8px">${fmt(o.total)}</div>${actions} <button class="btn btn-outline btn-sm" onclick="printLabel('${o.id}')">🖨️ Label pengiriman</button></div>
     </div>`;
   };
-  const sec=(t,list,fn,empty)=>`<h3 style="margin:22px 0 10px">${t} (${list.length})</h3>`+(list.length?list.map(fn).join(""):`<div class="empty-state" style="padding:18px">${empty}</div>`);
+    const tabs=[
+    {key:"Menunggu Verifikasi", label:"Menunggu Verifikasi Pembayaran", empty:"Tidak ada pembayaran yang perlu diverifikasi.",
+     act:o=>`<button class="btn btn-primary btn-sm" onclick="verifyOrder('${o.id}','approve')">Setujui</button> <button class="btn btn-danger btn-sm" onclick="verifyOrder('${o.id}','reject')">Tolak</button>`},
+    {key:"Diproses", label:"Diproses (siap dikirim)", empty:"Tidak ada pesanan yang menunggu dikirim.",
+     act:o=>`<button class="btn btn-primary btn-sm" onclick="shipOrder('${o.id}')">Tandai Dikirim</button>`},
+    {key:"Dikirim", label:"Dalam Pengiriman", empty:"Tidak ada pesanan dalam pengiriman.",
+     act:o=>`<span style="font-size:12px;color:var(--muted)">Menunggu konfirmasi pembeli</span>`}
+  ];
+  const cur=tabs.find(t=>t.key===verifTab)||tabs[0];
+  const list=all.filter(o=>o.status===cur.key);
   document.getElementById("verifList").innerHTML =
-    sec("Menunggu Verifikasi Pembayaran",all.filter(o=>o.status==="Menunggu Verifikasi"),o=>row(o,`<button class="btn btn-primary btn-sm" onclick="verifyOrder('${o.id}','approve')">Setujui</button> <button class="btn btn-danger btn-sm" onclick="verifyOrder('${o.id}','reject')">Tolak</button>`),"Tidak ada pembayaran yang perlu diverifikasi.")+
-    sec("Diproses (siap dikirim)",all.filter(o=>o.status==="Diproses"),o=>row(o,`<button class="btn btn-primary btn-sm" onclick="shipOrder('${o.id}')">Tandai Dikirim</button>`),"Tidak ada pesanan yang menunggu dikirim.")+
-    sec("Dalam Pengiriman",all.filter(o=>o.status==="Dikirim"),o=>row(o,`<span style="font-size:12px;color:var(--muted)">Menunggu konfirmasi pembeli</span>`),"Tidak ada pesanan dalam pengiriman.");
+    `<div class="vtabs">${tabs.map(t=>`<button class="vtab ${t.key===cur.key?'on':''}" onclick="setVerifTab('${t.key}')">${t.label}<b>${all.filter(o=>o.status===t.key).length}</b></button>`).join("")}</div>`+
+    (list.length ? list.map(o=>row(o,cur.act(o))).join("") : `<div class="empty-state" style="padding:30px 18px">${cur.empty}</div>`);
 }
+let verifTab="Menunggu Verifikasi";
+function setVerifTab(t){ verifTab=t; renderAdminVerifikasi(); }
 async function verifyOrder(id,action){
   const {ok, data} = await apiRequest("POST", `/api/admin/orders/${id}/verify`, {action});
   if(!ok){ toast(data.error || "Gagal memproses verifikasi."); return; }
@@ -1186,8 +1205,10 @@ function go(page){
   if(window._lastToast && Date.now()-window._lastToast.t<2200){
     sessionStorage.setItem("hw_pendingToast",window._lastToast.m);
   }
-  location.href = page + ".html";
+  document.body.classList.add("leaving");
+  setTimeout(()=>{ location.href = page + ".html"; }, 180);
 }
+window.addEventListener("pageshow",()=>document.body.classList.remove("leaving"));
 
 /* INIT */
 const NAVBAR_HTML = `<nav class="navbar">
@@ -1205,9 +1226,22 @@ const NAVBAR_HTML = `<nav class="navbar">
         <div class="icon-btn" onclick="onProfileIconClick()">👤</div>
         <div class="dropdown-menu" id="dropdownMenu"></div>
       </div>
+      <button class="icon-btn menu-btn" id="menuBtn" onclick="toggleMobileMenu()" aria-label="Menu"><span class="bars"><i></i><i></i><i></i></span></button>
     </div>
   </div>
-</nav>`;
+</nav>
+<div class="mobile-menu" id="mobileMenu">
+  <a onclick="go('home')" data-nav="home">Beranda</a>
+  <a onclick="go('katalog')" data-nav="katalog">Katalog</a>
+  <a onclick="go('tentang')" data-nav="tentang">Tentang Kami</a>
+  <a onclick="go('kontak')" data-nav="kontak">Kontak</a>
+</div>`;
+function toggleMobileMenu(force){
+  const m=document.getElementById("mobileMenu"), b=document.getElementById("menuBtn");
+  const open = typeof force==="boolean" ? force : !m.classList.contains("open");
+  m.classList.toggle("open",open); b.classList.toggle("open",open);
+  document.body.classList.toggle("menu-open",open);
+}
 (async function boot(){
   const page = document.body.dataset.page;
   document.body.insertAdjacentHTML("afterbegin", NAVBAR_HTML);

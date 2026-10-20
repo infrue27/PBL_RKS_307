@@ -77,3 +77,24 @@ def admin_set_user_status(user_id):
 
     order_count = Order.query.filter_by(user_id=user.id).count()
     return jsonify({"user": admin_user_to_dict(user, order_count)})
+
+
+@admin_users_bp.route("/admin/users/<int:user_id>", methods=["DELETE"])
+@admin_required
+def admin_delete_user(user_id):
+    user = User.query.get_or_404(user_id)
+
+    if user.id == current_user.id:
+        return jsonify({"error": "Kamu tidak bisa menghapus akunmu sendiri."}), 400
+    if user.role == "admin":
+        return jsonify({"error": "Akun admin tidak bisa dihapus dari sini."}), 403
+
+    # Akun yang sudah punya pesanan tidak dihapus, supaya riwayat penjualan tetap utuh.
+    if Order.query.filter_by(user_id=user.id).count() > 0:
+        return jsonify({
+            "error": "Akun ini punya riwayat pesanan, jadi tidak bisa dihapus. Nonaktifkan saja."
+        }), 409
+
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({"ok": True})

@@ -485,3 +485,79 @@ a{cursor:pointer;}
 .hero-img.photo img{width:100%;height:100%;object-fit:cover;display:block;}
 .hero-img.photo-contain{background:#fff;}
 .hero-img.photo-contain img{object-fit:contain;}
+/* ===== SEARCH KATALOG ===== */
+.search-bar{position:relative;margin-bottom:20px;}
+.search-bar svg{position:absolute;left:16px;top:50%;transform:translateY(-50%);color:var(--muted);pointer-events:none;}
+.search-bar input{width:100%;padding:14px 16px 14px 46px;border:1px solid var(--border);border-radius:999px;background:var(--white);font-size:16px;transition:.2s;}
+.search-bar input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 4px rgba(193,112,63,.15);}
+
+/* ===== KARTU PERJALANAN (FLIP) ===== */
+.flip-hint{text-align:center;color:var(--muted);font-size:13px;margin:-10px 0 20px;}
+.flip-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;}
+.flip{perspective:900px;height:170px;cursor:pointer;outline:none;}
+.flip-in{position:relative;width:100%;height:100%;transition:transform .6s cubic-bezier(.4,.2,.2,1);transform-style:preserve-3d;}
+.flip.flipped .flip-in{transform:rotateY(180deg);}
+.flip:focus-visible .flip-in{box-shadow:0 0 0 3px rgba(193,112,63,.4);border-radius:14px;}
+.flip-f,.flip-b{position:absolute;inset:0;border-radius:14px;padding:18px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;backface-visibility:hidden;-webkit-backface-visibility:hidden;border:1px solid var(--border);}
+.flip-f{background:var(--white);}
+.flip-f .yr{font-family:'Fraunces',serif;font-size:30px;font-weight:700;color:var(--accent-dark);}
+.flip-f h3{font-size:15px;margin:6px 0 0;color:var(--brown-dark);}
+.flip-f span{position:absolute;right:12px;bottom:8px;font-size:16px;color:var(--muted);}
+.flip-b{background:var(--brown-dark);color:#EFE4D2;transform:rotateY(180deg);}
+.flip-b p{margin:0;font-size:14px;line-height:1.7;}
+
+/* ===== TAMPILAN HP: LEBIH LEGA ===== */
+@media(max-width:900px){
+  .container{padding:0 20px;}
+  .footer-wrap{padding:36px 20px 18px;}
+  .footer-bottom{padding:14px 20px;}
+  .hero{padding:28px 0 16px;}
+  .hero-text h1{font-size:30px;line-height:1.25;}
+  .hero-text p{max-width:none;font-size:15.5px;line-height:1.75;margin-bottom:22px;}
+  .hero-btns{gap:12px;}
+  .hero-img{border-radius:18px;margin-top:6px;}
+  .section{padding:30px 0;}
+  .section h2{font-size:22px;margin-bottom:22px;}
+  .grid{gap:16px;}
+  .pcard .info{padding:12px;}
+  .card,.cart-summary{padding:20px;}
+  .cart-item,.order-row{padding:16px;}
+  .admin-header{padding:18px 20px;}
+  .admin-main{padding:20px;}
+  .flip-grid{grid-template-columns:repeat(2,1fr);}
+}
+@media(max-width:600px){
+  .container{padding:0 20px;}
+  .grid{gap:14px;}
+  .flip{height:150px;}
+}
+
+/* ===== LAPORAN DASHBOARD (rentang tanggal, export, diagram lingkaran) ===== */
+.report-bar{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;flex-wrap:wrap;margin-bottom:20px;}
+.report-dates{display:flex;align-items:flex-end;gap:10px;flex-wrap:wrap;}
+.report-dates label{display:flex;flex-direction:column;gap:5px;font-size:12px;font-weight:600;color:var(--brown);}
+.report-dates input[type=date]{padding:9px 12px;border:1px solid var(--border);border-radius:8px;background:var(--white);font:inherit;font-size:14px;color:var(--text);}
+.report-dates input[type=date]:focus{outline:2px solid var(--accent);border-color:var(--accent);}
+.report-export{display:flex;gap:8px;flex-wrap:wrap;}
+.kpi-donuts.loading{opacity:.5;transition:opacity .2s;}
+.kpi-donut b{font-family:'Fraunces',serif;margin-bottom:14px;}
+.kpi-donut small{display:block;margin-top:10px;font-size:11px;color:var(--muted);line-height:1.4;}
+.donut-row{display:flex;align-items:center;gap:14px;}
+.donut{width:88px;height:88px;border-radius:50%;flex-shrink:0;position:relative;animation:pop .5s ease;}
+.donut::after{content:"";position:absolute;inset:23px;background:var(--white);border-radius:50%;}
+.lg{flex:1;min-width:0;font-size:12px;}
+.lg-row{display:flex;align-items:center;gap:6px;line-height:1.9;white-space:nowrap;}
+.lg-row i{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+.lg-row em{font-style:normal;color:var(--muted);margin-left:auto;padding-left:8px;font-size:11.5px;}
+#repTable .total-row td{font-weight:700;background:var(--cream-2);}
+.kpi-donuts{grid-template-columns:repeat(2,minmax(0,1fr));}
+.kpi-donut{min-width:0;}
+@media(min-width:1400px){.kpi-donuts{grid-template-columns:repeat(4,minmax(0,1fr));}}
+@media(max-width:600px){
+  .kpi-donuts{grid-template-columns:minmax(0,1fr);}
+  .report-dates{width:100%;}
+  .report-dates label{flex:1;}
+  .report-dates input[type=date]{width:100%;font-size:16px;}
+  .report-export{width:100%;}
+  .report-export .btn{flex:1;}
+}
