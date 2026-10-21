@@ -561,3 +561,15 @@ a{cursor:pointer;}
   .report-export{width:100%;}
   .report-export .btn{flex:1;}
 }
+
+/* ===== ADMIN VERIFIKASI: 3 TAB ===== */
+.vtabs{display:flex;gap:8px;margin-bottom:18px;overflow-x:auto;padding-bottom:4px;-webkit-overflow-scrolling:touch;}
+.vtab{flex:0 0 auto;display:flex;align-items:center;gap:8px;padding:11px 18px;border-radius:999px;border:1px solid var(--border);background:var(--white);color:var(--brown);font-size:14px;font-weight:600;white-space:nowrap;transition:.2s;}
+.vtab b{min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--cream-2);color:var(--brown-dark);font-size:12px;display:inline-flex;align-items:center;justify-content:center;}
+.vtab.on{background:var(--accent);border-color:var(--accent);color:#fff;}
+.vtab.on b{background:rgba(255,255,255,.25);color:#fff;}
+
+/* ===== TRANSISI HALAMAN & AKSI USER ===== */
+body{transition:opacity .18s ease;}
+body.leaving{opacity:0;}
+.user-actions{display:flex;gap:8px;flex-wrap:nowrap;}

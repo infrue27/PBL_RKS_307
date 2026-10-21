@@ -66,6 +66,9 @@ def create_app(config_class=Config):
     from .admin_users import admin_users_bp
     app.register_blueprint(admin_users_bp)
 
+    from .admin_report import admin_report_bp
+    app.register_blueprint(admin_report_bp)
+
     from .profile import profile_bp
     app.register_blueprint(profile_bp)
 
