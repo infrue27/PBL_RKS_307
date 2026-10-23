@@ -27,7 +27,6 @@ def admin_user_to_dict(user, order_count):
 @admin_users_bp.route("/admin/users", methods=["GET"])
 @admin_required
 def admin_list_users():
-    # jumlah order per user, dihitung sekali lewat subquery (bukan N+1 query)
     order_counts = (
         db.session.query(Order.user_id, func.count(Order.id).label("n"))
         .group_by(Order.user_id)
@@ -89,7 +88,6 @@ def admin_delete_user(user_id):
     if user.role == "admin":
         return jsonify({"error": "Akun admin tidak bisa dihapus dari sini."}), 403
 
-    # Akun yang sudah punya pesanan tidak dihapus, supaya riwayat penjualan tetap utuh.
     if Order.query.filter_by(user_id=user.id).count() > 0:
         return jsonify({
             "error": "Akun ini punya riwayat pesanan, jadi tidak bisa dihapus. Nonaktifkan saja."

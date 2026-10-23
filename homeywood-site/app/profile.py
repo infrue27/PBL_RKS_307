@@ -1,5 +1,3 @@
-# Hanya nama, telepon, dan alamat yang bisa diubah dari sini. Username, email, dan role sengaja tidak bisa diubah (role terutama: jangan sampai user bisa menaikkan dirinya jadi admin lewat request buatan sendiri).
-
 from flask import Blueprint, jsonify, request
 from flask_login import current_user, login_required
 

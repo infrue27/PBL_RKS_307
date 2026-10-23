@@ -1,16 +1,13 @@
 import os
 
-from flask import Flask, abort, redirect, send_from_directory
+from flask import Flask, abort, redirect, request, send_from_directory
 from flask_login import current_user
 
 from config import Config
 from .extensions import db, login_manager
 
-# Folder project (homeywood-site/), satu tingkat di atas folder app/ ini
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
-# Daftar semua halaman yang boleh diakses lewat /<nama>.html
-# Tambahkan nama file baru ke sini kalau temanmu bikin halaman baru
 ALLOWED_PAGES = {
     "home", "katalog", "detail", "keranjang", "checkout", "profile",
     "kontak", "tentang", "login", "register", "lupa-password", "reset-password",
@@ -22,8 +19,8 @@ def create_app(config_class=Config):
     app = Flask(
         __name__,
         root_path=BASE_DIR,
-        template_folder="pages",   # baca folder pages/ punya teman, bukan templates/
-        static_folder=None,        # /css dan /js diurus manual di bawah, bukan /static
+        template_folder="pages",
+        static_folder=None,
     )
     app.config.from_object(config_class)
 
@@ -81,7 +78,6 @@ def create_app(config_class=Config):
     from .reviews import reviews_bp
     app.register_blueprint(reviews_bp)
 
-    # ---- Folder upload (bukti bayar, nanti avatar juga) ----
     app.config["UPLOAD_ROOT"] = os.path.join(BASE_DIR, app.config.get("UPLOAD_FOLDER", "uploads"))
     os.makedirs(app.config["UPLOAD_ROOT"], exist_ok=True)
 
@@ -93,13 +89,12 @@ def create_app(config_class=Config):
         folder = parts[0]
 
         if folder in ("products", "reviews"):
-            pass  # foto produk & foto ulasan publik: tamu yang belum login juga melihatnya
+            pass
         elif not current_user.is_authenticated:
             return login_manager.unauthorized()
         elif folder == "avatars":
-            pass  # foto profil: cukup login
+            pass
         elif folder == "payment_proofs":
-            # bukti bayar: hanya admin dan pemilik order
             if not current_user.is_admin:
                 from .models import Order, Payment
                 owner = (
@@ -114,7 +109,7 @@ def create_app(config_class=Config):
             abort(404)
         return send_from_directory(app.config["UPLOAD_ROOT"], filename)
 
-    # ---- Menyajikan file CSS & JS langsung dari folder css/ dan js/ ----
+
     @app.route("/css/<path:filename>")
     def css_files(filename):
         return send_from_directory(os.path.join(BASE_DIR, "css"), filename)
@@ -127,11 +122,14 @@ def create_app(config_class=Config):
     def img_files(filename):
         return send_from_directory(os.path.join(BASE_DIR, "img"), filename)
 
-    # ---- Menyajikan tiap halaman: /login.html, /register.html, dst ----
-    # Ini sengaja pakai ".html" di URL supaya cocok dengan go() di app.js
-    # yang menulis location.href = page + ".html"
-    @app.route("/<page>.html")
+    @app.route("/<page>")
     def page(page):
+        if page.endswith(".html"):
+            clean = page[:-5]
+            if clean not in ALLOWED_PAGES:
+                abort(404)
+            qs = request.query_string.decode()
+            return redirect("/" + clean + ("?" + qs if qs else ""), 302)
         if page not in ALLOWED_PAGES:
             abort(404)
         from flask import render_template
@@ -139,8 +137,13 @@ def create_app(config_class=Config):
 
     @app.route("/")
     def root():
-        return redirect("/home.html")
+        return redirect("/home")
 
-    # Blueprint lain (katalog, cart, admin, dst) akan didaftarkan di sini nanti
-
+    @app.after_request
+    def security_headers(resp):
+        resp.headers.setdefault("X-Content-Type-Options", "nosniff")
+        resp.headers.setdefault("X-Frame-Options", "SAMEORIGIN")
+        resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
+        return resp
+    
     return app

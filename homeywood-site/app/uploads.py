@@ -7,7 +7,6 @@ from flask import current_app
 
 MAX_IMAGE_BYTES = 2 * 1024 * 1024
 
-
 def _detect_ext(head):
     if head.startswith(b"\xff\xd8\xff"):
         return "jpg"
@@ -17,9 +16,7 @@ def _detect_ext(head):
         return "webp"
     return None
 
-
 def save_image_bytes(raw, subfolder, max_bytes=MAX_IMAGE_BYTES):
-    """Validasi lalu simpan gambar (bytes) ke uploads/<subfolder>/. Return path relatif, atau raise ValueError."""
     if len(raw) > max_bytes:
         raise ValueError("Ukuran foto maksimal 2 MB.")
     ext = _detect_ext(raw[:12])
@@ -33,15 +30,11 @@ def save_image_bytes(raw, subfolder, max_bytes=MAX_IMAGE_BYTES):
         f.write(raw)
     return f"{subfolder}/{filename}"
 
-
 def save_image(file_storage, subfolder, max_bytes=MAX_IMAGE_BYTES):
-    """Untuk upload file biasa (multipart): foto produk dan foto profil."""
     raw = file_storage.read(max_bytes + 1)
     return save_image_bytes(raw, subfolder, max_bytes)
 
-
 def decode_data_url(data_url):
-    """Untuk foto yang dikirim sebagai data URL (foto ulasan). Return bytes, atau raise ValueError."""
     if not isinstance(data_url, str):
         raise ValueError("Format foto tidak valid.")
     m = re.match(r"^data:image/[\w.+-]+;base64,(.+)$", data_url, re.S)
@@ -52,9 +45,7 @@ def decode_data_url(data_url):
     except Exception:
         raise ValueError("Format foto tidak valid.")
 
-
 def delete_upload(rel_path):
-    """Hapus file lama (aman: hanya file di dalam folder uploads)."""
     if not rel_path:
         return
     root = os.path.realpath(current_app.config["UPLOAD_ROOT"])
@@ -64,7 +55,6 @@ def delete_upload(rel_path):
             os.remove(full)
         except OSError:
             pass
-
 
 def upload_url(rel_path):
     return f"/uploads/{rel_path}" if rel_path else None

@@ -1,5 +1,3 @@
-/* Laporan dashboard admin: rentang tanggal, diagram lingkaran, export.
-   File ini berdiri sendiri (tidak mengubah app.js). Hanya jalan di admin-dashboard.html. */
 (function(){
   var COLORS = {Sofa:"#C1703F", Meja:"#6B4A32", Kursi:"#E0A458", Lemari:"#9A7A5C", Lainnya:"#B9AE9F", Aktif:"#4C7A4C", Nonaktif:"#B5493A"};
   var box = document.getElementById("kpiDonuts");

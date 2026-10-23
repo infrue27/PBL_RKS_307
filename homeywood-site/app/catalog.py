@@ -1,3 +1,4 @@
+import math
 import re
 from functools import wraps
 
@@ -25,6 +26,24 @@ def admin_required(fn):
 def slugify(name):
     return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "produk"
 
+MAX_PRICE = 1_000_000_000
+MAX_STOCK = 100_000
+
+def parse_price(value):
+    try:
+        price = float(value)
+    except (TypeError, ValueError):
+        return None
+    if not math.isfinite(price) or price < 0 or price > MAX_PRICE:
+        return None
+    return round(price, 2)
+
+def parse_stock(value):
+    try:
+        stock = int(value)
+    except (TypeError, ValueError, OverflowError):
+        return None
+    return stock if 0 <= stock <= MAX_STOCK else None
 
 def unique_slug(base):
     slug = base
@@ -86,8 +105,6 @@ def get_product(product_id):
     return jsonify({"product": product_to_dict(p, rating_data_for([p.id])[p.id])})
 
 
-# utk admin tambah, edit, hapus produk
-
 @catalog_bp.route("/admin/products", methods=["POST"])
 @admin_required
 def admin_create_product():
@@ -99,13 +116,12 @@ def admin_create_product():
 
     if not name:
         return jsonify({"error": "Nama produk wajib diisi."}), 400
-    try:
-        price = float(data.get("price"))
-        stock = int(data.get("stock"))
-    except (TypeError, ValueError):
-        return jsonify({"error": "Harga dan stok harus berupa angka."}), 400
-    if price < 0 or stock < 0:
-        return jsonify({"error": "Harga dan stok tidak boleh negatif."}), 400
+    price = parse_price(data.get("price"))
+    stock = parse_stock(data.get("stock"))
+    if price is None or stock is None:
+        return jsonify({"error": "Harga atau stok tidak valid."}), 400
+    if len(name) > 150 or len(desc) > 5000 or (material and len(material) > 50):
+        return jsonify({"error": "Nama, bahan, atau deskripsi terlalu panjang."}), 400
 
     category = Category.query.filter_by(name=category_name).first()
     if not category:
@@ -151,23 +167,16 @@ def admin_update_product(product_id):
     if "desc" in data:
         product.description = (data.get("desc") or "").strip()
     if "price" in data:
-        try:
-            price = float(data.get("price"))
-            if price < 0:
-                raise ValueError
-            product.price = price
-        except (TypeError, ValueError):
+        price = parse_price(data.get("price"))
+        if price is None:
             return jsonify({"error": "Harga tidak valid."}), 400
+        product.price = price
     if "stock" in data:
-        try:
-            stock = int(data.get("stock"))
-            if stock < 0:
-                raise ValueError
-            product.stock = stock
-        except (TypeError, ValueError):
+        stock = parse_stock(data.get("stock"))
+        if stock is None:
             return jsonify({"error": "Stok tidak valid."}), 400
-
-    # utk foto bisa ganti, hapus, atau biarin aja
+        product.stock = stock
+    
     old_image = None
     file = request.files.get("image")
     if file and file.filename:

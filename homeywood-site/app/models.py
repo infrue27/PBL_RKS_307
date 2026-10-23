@@ -1,7 +1,3 @@
-"""
-Model ini MENCERMINKAN schema.sql (acuan pembuatan tabel).
-Jangan pakai db.create_all(); tabel dibuat dari schema.sql.
-"""
 from flask_login import UserMixin
 from werkzeug.security import check_password_hash, generate_password_hash
 
@@ -62,7 +58,7 @@ class Product(db.Model):
     stock = db.Column(db.Integer, nullable=False, default=0)
     material = db.Column(db.String(50))
     image_path = db.Column(db.String(255))
-    icon_emoji = db.Column(db.String(10))  # sementara, sampai upload gambar produk beneran ada
+    icon_emoji = db.Column(db.String(10))
     is_active = db.Column(db.Boolean, nullable=False, default=True)
     created_at = db.Column(db.DateTime, server_default=db.func.now())
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())

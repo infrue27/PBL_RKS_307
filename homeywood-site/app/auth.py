@@ -1,11 +1,13 @@
 import re
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user, logout_user
 
 from .extensions import db
 from .models import User
 from .uploads import upload_url
+
+from sqlalchemy.exc import IntegrityError
 
 auth_bp = Blueprint("auth", __name__, url_prefix="/api")
 
@@ -50,8 +52,12 @@ def register():
         return jsonify({"error": "Lengkapi semua data terlebih dahulu."}), 400
     if not USERNAME_RE.match(username):
         return jsonify({"error": "Username 3-30 karakter, hanya huruf/angka/titik/underscore."}), 400
+    if any(w in username.lower() for w in ("admin", "homeywood", "penjual")):
+        return jsonify({"error": "Username ini tidak tersedia, coba yang lain."}), 400
     if len(password) < 8:
         return jsonify({"error": "Kata sandi minimal 8 karakter."}), 400
+    if len(password) > 128:
+        return jsonify({"error": "Kata sandi maksimal 128 karakter."}), 400
 
     if User.query.filter(db.func.lower(User.email) == email).first():
         return jsonify({"error": "Email sudah terdaftar."}), 409
@@ -68,7 +74,11 @@ def register():
     )
     user.set_password(password)
     db.session.add(user)
-    db.session.commit()
+    try:
+        db.session.commit()
+    except IntegrityError:
+        db.session.rollback()
+        return jsonify({"error": "Email atau username sudah terdaftar."}), 409
 
     login_user(user)
     return jsonify({"user": user_to_dict(user)}), 201
@@ -82,9 +92,12 @@ def login():
 
     if not email or not password:
         return jsonify({"error": "Isi email dan password."}), 400
+    if len(password) > 128:
+        return jsonify({"error": "Email atau password salah."}), 401
 
     user = User.query.filter(db.func.lower(User.email) == email).first()
     if not user or not user.check_password(password):
+        current_app.logger.warning("Login gagal untuk %r dari %s", email, request.remote_addr)
         return jsonify({"error": "Email atau password salah."}), 401
     if not user.is_active:
         return jsonify({"error": "Akun ini dinonaktifkan. Hubungi admin."}), 403

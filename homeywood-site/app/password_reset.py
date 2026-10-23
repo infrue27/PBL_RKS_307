@@ -1,9 +1,3 @@
-# Alur keamanan reset pw:
-# Token acak 256-bit (secrets.token_urlsafe). Di database HANYA hash SHA-256-nya yang disimpan, token asli cuma ada di link email.
-# Token berlaku RESET_TOKEN_MINUTES menit (default 30) dan sekali pakai.
-# /api/forgot-password SELALU membalas pesan yang sama, ada atau tidak emailnya, supaya orang tidak bisa menebak email siapa yang terdaftar.
-# Meminta token baru menghapus token lama milik user itu.
-
 import hashlib
 import secrets
 import smtplib
@@ -45,7 +39,6 @@ def _reset_email_html(name, link, minutes):
 </div>"""
 
 def _send_email(cfg, to_addr, subject, body, html=None):
-    """Kirim email lewat SMTP. Dijalankan di thread terpisah supaya request tidak menunggu."""
     try:
         msg = EmailMessage()
         msg["From"] = formataddr(("Homey Wood", parseaddr(cfg["MAIL_FROM"])[1]))
@@ -87,7 +80,7 @@ def forgot_password():
         db.session.commit()
 
         base = (current_app.config.get("APP_BASE_URL") or "http://127.0.0.1:5000").rstrip("/")
-        link = f"{base}/reset-password.html?token={token}"
+        link = f"{base}/reset-password?token={token}"
         body = (
             f"Halo {user.username},\n\n"
             "Kami menerima permintaan untuk mereset kata sandi akun Homey Wood Anda.\n"
@@ -144,8 +137,6 @@ def reset_password():
 
 @reset_bp.route("/reset-password/check", methods=["POST"])
 def check_reset_token():
-    """Dipanggil halaman reset-password.html saat dibuka, untuk memastikan link
-    masih berlaku SEBELUM user mengetik password baru. Tidak mengubah apa pun."""
     data = request.get_json(silent=True) or {}
     token = data.get("token")
     if not isinstance(token, str) or not token.strip():

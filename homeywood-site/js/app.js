@@ -1206,7 +1206,7 @@ function go(page){
     sessionStorage.setItem("hw_pendingToast",window._lastToast.m);
   }
   document.body.classList.add("leaving");
-  setTimeout(()=>{ location.href = page + ".html"; }, 180);
+  setTimeout(()=>{   location.href = "/" + page; }, 180);
 }
 window.addEventListener("pageshow",()=>document.body.classList.remove("leaving"));
 

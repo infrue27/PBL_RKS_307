@@ -1,6 +1,5 @@
 import base64
 import os
-import random
 import re
 import string
 import secrets
@@ -13,6 +12,7 @@ from flask_login import current_user, login_required
 from .catalog import admin_required
 from .extensions import db
 from .models import CartItem, Order, OrderItem, Payment, Product
+from .uploads import decode_data_url, save_image_bytes
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/api")
 
@@ -66,6 +66,31 @@ def gen_order_code():
             return code
     raise RuntimeError("Gagal membuat kode pesanan unik, coba lagi.")
 
+UNPAID_TTL_MINUTES = 30
+MAX_PENDING_PER_USER = 3
+
+def expire_stale_orders():
+    """Batalkan pesanan belum dibayar > 30 menit dan kembalikan stoknya."""
+    stale = (Order.query
+             .filter(Order.status == "menunggu_pembayaran",
+                     Order.created_at < db.literal_column(f"(NOW() - INTERVAL {UNPAID_TTL_MINUTES} MINUTE)"))
+             .with_for_update().all())
+    changed = False
+    for o in stale:
+        if o.payment and o.payment.midtrans_status == "settlement":
+            continue
+        o.status = "dibatalkan"
+        if o.payment:
+            o.payment.status = "rejected"
+        for item in o.items:
+            if item.product_id:
+                Product.query.filter_by(id=item.product_id).update(
+                    {Product.stock: Product.stock + item.quantity}, synchronize_session=False)
+        changed = True
+    if changed:
+        db.session.commit()
+    else:
+        db.session.rollback()
 
 PROOF_EXT = {"jpeg": "jpg", "jpg": "jpg", "png": "png", "webp": "webp"}
 MAX_PROOF_BYTES = 3 * 1024 * 1024
@@ -110,10 +135,11 @@ def write_payment_proof(ext, raw, order_code):
 
 
 def save_payment_proof(data_url, order_code):
-    decoded = decode_payment_proof(data_url)
-    if not decoded:
+    """Validasi (ukuran, isi file asli, bukan SVG) dan simpan lewat uploads.py."""
+    try:
+        return save_image_bytes(decode_data_url(data_url), "payment_proofs")
+    except ValueError:
         return None
-    return write_payment_proof(decoded[0], decoded[1], order_code)
 
 
 def order_to_dict(order):
@@ -147,6 +173,7 @@ def order_to_dict(order):
 @orders_bp.route("/orders", methods=["GET"])
 @login_required
 def list_orders():
+    expire_stale_orders()
     orders = Order.query.filter_by(user_id=current_user.id).order_by(Order.created_at.desc()).all()
     return jsonify({"orders": [order_to_dict(o) for o in orders]})
 
@@ -183,6 +210,11 @@ def create_order():
     is_cod = payment_method == "Bayar di Tempat (COD)"
     is_qris = payment_method == "QRIS"
 
+    expire_stale_orders()
+    if is_qris and Order.query.filter_by(
+            user_id=current_user.id, status="menunggu_pembayaran").count() >= MAX_PENDING_PER_USER:
+        return jsonify({"error": "Kamu masih punya beberapa pesanan QRIS yang belum dibayar. "
+                                     "Selesaikan atau tunggu kedaluwarsa dulu."}), 429
     payment_label = payment_method
     if payment_method == "Transfer Bank":
         client_label = str(data.get("payment_label") or "").strip()
@@ -268,7 +300,6 @@ def create_order():
         return jsonify({"error": "Gagal menyimpan pesanan. Silakan coba lagi."}), 500
     return jsonify({"order": order_to_dict(order)}), 201
 
-# utk admin bisa lihat order, verifikasi bayar, dan kirim
 
 def admin_order_to_dict(order):
     d = order_to_dict(order)
@@ -288,7 +319,8 @@ def admin_list_orders():
 @admin_required
 def admin_verify_payment(order_code):
     order = Order.query.filter_by(order_code=order_code).with_for_update().first_or_404()
-    data = request.get_json(silent=True) or {}
+    data = request.get_json(silent=True)
+    data = data if isinstance(data, dict) else {}
     action = data.get("action")
     if action not in ("approve", "reject"):
         return jsonify({"error": "action harus 'approve' atau 'reject'."}), 400
@@ -306,8 +338,9 @@ def admin_verify_payment(order_code):
             payment.status = "rejected"
             payment.admin_note = (data.get("note") or "").strip() or None
         for item in order.items:
-            if item.product:
-                item.product.stock += item.quantity
+            if item.product_id:
+                Product.query.filter_by(id=item.product_id).update(
+                    {Product.stock: Product.stock + item.quantity}, synchronize_session=False)
 
     if payment:
         payment.verified_by = current_user.id
@@ -320,7 +353,7 @@ def admin_verify_payment(order_code):
 @orders_bp.route("/admin/orders/<order_code>/ship", methods=["POST"])
 @admin_required
 def admin_ship_order(order_code):
-    order = Order.query.filter_by(order_code=order_code).first_or_404()
+    order = Order.query.filter_by(order_code=order_code).with_for_update().first_or_404()
     if order.status != "diproses":
         return jsonify({"error": f"Order berstatus '{STATUS_LABELS.get(order.status, order.status)}', belum bisa dikirim."}), 400
     order.status = "dikirim"

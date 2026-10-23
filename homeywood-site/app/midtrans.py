@@ -1,14 +1,3 @@
-"""QRIS dinamis lewat Midtrans (Sandbox).
-
-Alur:
-  1. Pembeli klik "Buat Pesanan" -> order dibuat berstatus menunggu_pembayaran.
-  2. POST /api/orders/<kode>/qris        -> backend minta QR ke Midtrans.
-  3. Frontend menampilkan QR dan memanggil GET /api/orders/<kode>/qris-status tiap 3 detik.
-  4. POST /api/orders/<kode>/proof       -> pembeli unggah bukti bayar (wajib).
-  5. Kalau Midtrans = settlement DAN bukti sudah ada -> status menunggu_verifikasi,
-     lalu admin approve/reject seperti biasa.
-  6. POST /api/midtrans/notification     -> webhook (opsional untuk simulasi lokal).
-"""
 import hashlib
 import hmac
 from datetime import datetime, timedelta
@@ -18,8 +7,9 @@ from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
 from .extensions import db
-from .models import Order, Payment
+from .models import Order, Payment, Product
 from .orders import save_payment_proof
+from .uploads import delete_upload
 
 midtrans_bp = Blueprint("midtrans", __name__, url_prefix="/api")
 
@@ -33,7 +23,6 @@ def _base():
 
 
 def _parse_expiry(text):
-    """expiry_time dari Midtrans memakai WIB (UTC+7). Kita simpan sebagai UTC."""
     try:
         return datetime.strptime(text, "%Y-%m-%d %H:%M:%S") - timedelta(hours=7)
     except (TypeError, ValueError):
@@ -41,7 +30,6 @@ def _parse_expiry(text):
 
 
 def advance(order):
-    """Pindah ke antrean admin kalau Midtrans settlement DAN bukti sudah diunggah."""
     pay = order.payment
     if (order.status == "menunggu_pembayaran" and pay
             and pay.midtrans_status == "settlement" and pay.proof_path):
@@ -50,7 +38,6 @@ def advance(order):
 
 
 def apply_status(order, data):
-    """Satu-satunya tempat status order diubah berdasarkan info dari Midtrans."""
     ts = data.get("transaction_status")
     if not ts:
         return
@@ -74,8 +61,9 @@ def apply_status(order, data):
         if pay:
             pay.status = "rejected"
         for item in order.items:
-            if item.product:
-                item.product.stock += item.quantity
+            if item.product_id:
+                Product.query.filter_by(id=item.product_id).update(
+                    {Product.stock: Product.stock + item.quantity}, synchronize_session=False)
 
 
 def _get_order(order_code):
@@ -95,7 +83,6 @@ def create_qris(order_code):
         current_app.logger.error("MIDTRANS_SERVER_KEY belum diisi atau formatnya salah")
         return jsonify({"error": "Pembayaran QRIS sedang tidak tersedia."}), 503
 
-    # QR yang sama dipakai lagi kalau belum kedaluwarsa (Midtrans menolak order_id ganda)
     pay = order.payment
     if pay and pay.qr_url and pay.qr_expires_at and pay.qr_expires_at > datetime.utcnow():
         return jsonify({"qr_url": pay.qr_url, "amount": float(order.total_amount)})
@@ -106,7 +93,7 @@ def create_qris(order_code):
         "qris": {"acquirer": "gopay"},
     }
     try:
-        r = requests.post(f"{_base()}/v2/charge", json=payload, auth=_auth(), timeout=20)
+        r = requests.post(f"{_base()}/v2/charge", json=payload, auth=_auth(), timeout=10)
         data = r.json()
     except (requests.RequestException, ValueError):
         return jsonify({"error": "Tidak bisa menghubungi Midtrans. Coba lagi sebentar."}), 502
@@ -163,9 +150,11 @@ def upload_qris_proof(order_code):
     path = save_payment_proof(data.get("payment_proof"), order.order_code)
     if not path:
         return jsonify({"error": "Format bukti pembayaran tidak valid."}), 400
+    old = order.payment.proof_path
     order.payment.proof_path = path
     advance(order)
     db.session.commit()
+    delete_upload(old)
     return jsonify({"status": order.status})
 
 

@@ -1,9 +1,8 @@
-"""Laporan penjualan admin: rekap per rentang tanggal + export Excel / PDF."""
-import io
 from datetime import datetime, timedelta
 
 from flask import Blueprint, jsonify, request, send_file
 from sqlalchemy import func
+from sqlalchemy.orm import joinedload
 
 from .catalog import admin_required
 from .extensions import db
@@ -12,7 +11,6 @@ from .orders import STATUS_LABELS
 
 admin_report_bp = Blueprint("admin_report", __name__, url_prefix="/api")
 
-# status yang dihitung sebagai penjualan (sama seperti dashboard lama)
 REVENUE_STATUSES = ("diproses", "dikirim", "selesai")
 CAT_ORDER = ["Sofa", "Meja", "Kursi", "Lemari"]
 
@@ -30,11 +28,12 @@ def _parse_range():
         d_to = today
     if d_to < d_from:
         d_from, d_to = d_to, d_from
+    if (d_to - d_from).days > 366:
+        d_from = d_to - timedelta(days=366)
     return d_from, d_to
 
 
 def _sort_cats(rows):
-    """rows: list of dict ber-key 'name'. Urutkan Sofa, Meja, Kursi, Lemari, lalu lainnya."""
     return sorted(rows, key=lambda r: (CAT_ORDER.index(r["name"]) if r["name"] in CAT_ORDER else 99, r["name"]))
 
 
@@ -52,7 +51,6 @@ def build_report(d_from, d_to):
     )
     total_orders = Order.query.filter(in_range).count()
 
-    # rekap per kategori (item pesanan -> produk -> kategori)
     cat_name = func.coalesce(Category.name, "Lainnya")
     rows = (
         db.session.query(
@@ -72,7 +70,6 @@ def build_report(d_from, d_to):
     recap = [sold.get(c, {"name": c, "qty": 0, "orders": 0, "revenue": 0.0}) for c in CAT_ORDER]
     recap += _sort_cats([v for k, v in sold.items() if k not in CAT_ORDER])
 
-    # produk aktif per kategori (tidak tergantung tanggal)
     prod_rows = (
         db.session.query(func.coalesce(Category.name, "Lainnya"), func.count(Product.id))
         .select_from(Product)
@@ -88,6 +85,12 @@ def build_report(d_from, d_to):
     active = User.query.filter_by(role="customer", is_active=True).count()
     inactive = User.query.filter_by(role="customer", is_active=False).count()
 
+    ship_total = total_revenue - sum(r["revenue"] for r in recap)
+    recap_table = recap + (
+        [{"name": "Ongkos kirim", "qty": 0, "orders": 0, "revenue": ship_total}]
+        if ship_total > 0.5 else []
+    )
+
     return {
         "from": d_from.isoformat(),
         "to": d_to.isoformat(),
@@ -95,14 +98,14 @@ def build_report(d_from, d_to):
         "orders": {"total": total_orders, "by_cat": [{"name": r["name"], "value": r["orders"]} for r in recap]},
         "products": {"total": sum(p["value"] for p in prod_by_cat), "by_cat": prod_by_cat},
         "users": {"total": active + inactive, "active": active, "inactive": inactive},
-        "recap": recap,
+        "recap": recap_table,
         "_range": (start, end),
     }
 
 
 def _order_rows(start, end):
     orders = (
-        Order.query.filter(Order.created_at >= start, Order.created_at < end, Order.status.in_(REVENUE_STATUSES))
+        Order.query.options(joinedload(Order.user)).filter(Order.created_at >= start, Order.created_at < end, Order.status.in_(REVENUE_STATUSES))
         .order_by(Order.created_at.asc(), Order.id.asc())
         .all()
     )
@@ -121,6 +124,10 @@ def _order_rows(start, end):
 def _rp(n):
     return "Rp " + f"{int(round(n)):,}".replace(",", ".")
 
+def _xl(value):
+    if isinstance(value, str) and value[:1] in ("=", "+", "-", "@", "\t", "\r"):
+        return "'" + value
+    return value
 
 @admin_report_bp.route("/admin/report", methods=["GET"])
 @admin_required
@@ -179,6 +186,7 @@ def export_xlsx():
     for c in ws2[1]:
         c.font, c.fill = bold, head_fill
     for row in _order_rows(start, end):
+        row[2] = _xl(row[2])
         ws2.append(row)
         ws2.cell(row=ws2.max_row, column=5).number_format = '"Rp" #,##0'
     for col, w in zip("ABCDE", (22, 18, 26, 16, 18)):
