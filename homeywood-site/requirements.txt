@@ -5,3 +5,5 @@ PyMySQL
 cryptography
 python-dotenv
 requests
+openpyxl
+reportlab
