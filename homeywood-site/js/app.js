@@ -155,9 +155,12 @@ function adminSidebarHTML(active){
 }
 
 function adminHeaderHTML(title,subtitle){
-  return `<div>
-      <h1>${title}</h1>
-      <p>${subtitle}</p>
+  return `<div class="admin-header-left">
+      <button type="button" class="admin-burger" onclick="toggleAdminSidebar()" aria-label="Buka/tutup menu"><span class="bars"><i></i><i></i><i></i></span></button>
+      <div>
+        <h1>${title}</h1>
+        <p>${subtitle}</p>
+      </div>
     </div>
     <div class="admin-header-right">
       <div class="status-online">Sistem Online</div>
@@ -1260,7 +1263,7 @@ function toggleMobileMenu(force){
 
 /* ANIMASI (scroll reveal, stagger) */
 (function motion(){
-  const sel=".pcard,.cat-item,.review-item,.order-row,.kpi,.hero-text,.hero-img,.review-summary,.cart-item";
+  const sel=".pcard,.cat-item,.review-item,.order-row,.kpi,.hero-text,.hero-img,.review-summary,.cart-item,.table-wrap,.report-bar";
   const io=("IntersectionObserver" in window) ? new IntersectionObserver(es=>es.forEach(e=>{ if(e.isIntersecting){ e.target.classList.add("in"); io.unobserve(e.target); } }),{threshold:.08}) : null;
   let sched=false;
   function scan(){
@@ -1273,4 +1276,59 @@ function toggleMobileMenu(force){
   }
   new MutationObserver(()=>{ if(!sched){ sched=true; requestAnimationFrame(scan); } }).observe(document.body,{childList:true,subtree:true});
   scan();
+})();
+
+/* IKON MATA: tampilkan / sembunyikan kata sandi (login, daftar, reset password) */
+(function eyeToggle(){
+  const EYE='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
+  const EYE_OFF='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.9 10.9 0 0 1 12 19c-6.4 0-10-7-10-7a18.5 18.5 0 0 1 5.06-5.94"/><path d="M9.9 4.24A10.4 10.4 0 0 1 12 4c6.4 0 10 7 10 7a18.6 18.6 0 0 1-2.16 3.19"/><path d="M14.12 14.12A3 3 0 1 1 9.88 9.88"/><line x1="1" y1="1" x2="23" y2="23"/></svg>';
+  function attach(inp){
+    if(inp.dataset.eye) return; inp.dataset.eye="1";
+    const wrap=inp.closest(".input-wrap"); if(!wrap) return;
+    wrap.classList.add("has-eye");
+    const b=document.createElement("button");
+    b.type="button"; b.className="eye-btn"; b.innerHTML=EYE;
+    b.setAttribute("aria-label","Tampilkan kata sandi");
+    b.addEventListener("mousedown",e=>e.preventDefault());   // fokus tetap di kolom password
+    b.addEventListener("click",()=>{
+      const show=inp.type==="password";
+      inp.type=show?"text":"password";
+      b.innerHTML=show?EYE_OFF:EYE;
+      b.setAttribute("aria-label",show?"Sembunyikan kata sandi":"Tampilkan kata sandi");
+      b.classList.remove("pop"); void b.offsetWidth; b.classList.add("pop");
+    });
+    wrap.appendChild(b);
+  }
+  function scan(){ document.querySelectorAll('.input-wrap input[type="password"]').forEach(attach); }
+  new MutationObserver(scan).observe(document.body,{childList:true,subtree:true});
+  scan();
+})();
+
+
+/* HAMBURGER ADMIN: HP = menu geser dari kiri, desktop = sidebar bisa disembunyikan */
+function toggleAdminSidebar(force){
+  const lay=document.querySelector(".admin-layout"); if(!lay) return;
+  const mobile=window.matchMedia("(max-width:900px)").matches;
+  const cls=mobile?"sb-open":"sb-collapsed";
+  const on=(typeof force==="boolean")?force:!lay.classList.contains(cls);
+  if(!lay.querySelector(".sb-overlay")){
+    const o=document.createElement("div"); o.className="sb-overlay";
+    o.addEventListener("click",()=>toggleAdminSidebar(false)); lay.appendChild(o);
+  }
+  lay.classList.toggle(cls,on);
+  const btn=document.querySelector(".admin-burger");
+  if(btn){
+    btn.classList.toggle("open",mobile&&on);
+    btn.setAttribute("aria-expanded",String(mobile?on:!on));
+  }
+  if(!mobile){ try{ localStorage.setItem("hw_sb_collapsed",on?"1":"0"); }catch(e){} }
+}
+(function adminBurger(){
+  const lay=document.querySelector(".admin-layout"); if(!lay) return;
+  try{ if(localStorage.getItem("hw_sb_collapsed")==="1" && !window.matchMedia("(max-width:900px)").matches) lay.classList.add("sb-collapsed"); }catch(e){}
+  document.addEventListener("keydown",e=>{ if(e.key==="Escape") lay.classList.contains("sb-open") && toggleAdminSidebar(false); });
+  window.matchMedia("(max-width:900px)").addEventListener("change",()=>{
+    lay.classList.remove("sb-open");
+    const b=document.querySelector(".admin-burger"); if(b){ b.classList.remove("open"); b.setAttribute("aria-expanded","false"); }
+  });
 })();

@@ -573,3 +573,113 @@ a{cursor:pointer;}
 body{transition:opacity .18s ease;}
 body.leaving{opacity:0;}
 .user-actions{display:flex;gap:8px;flex-wrap:nowrap;}
+
+/* ==========================================================================
+   TAMBAHAN: ikon mata (password), hamburger admin, animasi tambahan
+   ========================================================================== */
+
+/* ---- Ikon mata di kolom password ---- */
+.input-wrap.has-eye input{padding-right:46px !important;}
+.eye-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--muted);border-radius:8px;cursor:pointer;transition:color .15s,background .15s;}
+.eye-btn:hover{color:var(--accent);background:rgba(193,112,63,.1);}
+.eye-btn:focus-visible{outline:2px solid var(--accent);outline-offset:1px;}
+.input-wrap .eye-btn svg{position:static;left:auto;display:block;pointer-events:none;}
+.eye-btn.pop svg{animation:eyePop .32s ease;}
+@keyframes eyePop{0%{transform:scale(.6) rotate(-20deg);}60%{transform:scale(1.2);}100%{transform:none;}}
+
+/* ---- Tombol hamburger admin ---- */
+.admin-header-left{display:flex;align-items:center;gap:14px;min-width:0;}
+.admin-burger{width:42px;height:42px;flex-shrink:0;border:1px solid var(--border);background:var(--white);border-radius:10px;display:flex;align-items:center;justify-content:center;cursor:pointer;padding:0;transition:background .15s,border-color .15s,transform .15s;}
+.admin-burger:hover{background:var(--cream);border-color:var(--accent);}
+.admin-burger:active{transform:scale(.92);}
+.admin-burger:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.admin-burger .bars{width:18px;height:14px;position:relative;display:block;}
+.admin-burger .bars i{position:absolute;left:0;width:100%;height:2px;background:var(--brown-dark);border-radius:2px;transition:.25s;}
+.admin-burger .bars i:nth-child(1){top:0;}
+.admin-burger .bars i:nth-child(2){top:6px;}
+.admin-burger .bars i:nth-child(3){top:12px;}
+.admin-burger.open .bars i:nth-child(1){top:6px;transform:rotate(45deg);}
+.admin-burger.open .bars i:nth-child(2){opacity:0;}
+.admin-burger.open .bars i:nth-child(3){top:6px;transform:rotate(-45deg);}
+.sb-overlay{display:none;}
+
+/* Desktop: sidebar bisa disembunyikan */
+.admin-sidebar{transition:margin-left .3s cubic-bezier(.4,0,.2,1);}
+@media(min-width:901px){
+  .admin-layout.sb-collapsed .admin-sidebar{margin-left:-250px;visibility:hidden;transition:margin-left .3s cubic-bezier(.4,0,.2,1),visibility 0s linear .3s;}
+}
+
+/* HP / tablet: sidebar jadi menu geser dari kiri + latar gelap */
+@media(max-width:900px){
+  .admin-layout{flex-direction:row;}
+  .admin-sidebar{position:fixed;top:0;left:0;bottom:0;width:270px;max-width:84vw;z-index:1200;display:flex;flex-direction:column;flex-wrap:nowrap;justify-content:space-between;overflow-x:hidden;overflow-y:auto;
+    transform:translateX(-105%);transition:transform .32s cubic-bezier(.4,0,.2,1),box-shadow .32s;visibility:hidden;}
+  .admin-layout.sb-open .admin-sidebar{transform:none;visibility:visible;box-shadow:8px 0 30px rgba(0,0,0,.35);}
+  .admin-sidebar>div:first-child{display:block;}
+  .sidebar-brand{order:0;padding:22px 20px;}
+  .sidebar-footer{order:0;padding:18px 20px;border-top:1px solid rgba(255,255,255,.09);}
+  .sidebar-user{display:block;}
+  .sidebar-logout{width:100%;padding:10px;}
+  .sidebar-nav{display:block;flex:none;overflow:visible;padding:14px;margin:4px 0 0;border-top:1px solid rgba(255,255,255,.09);}
+  .sidebar-nav a{white-space:normal;margin-bottom:6px;padding:12px 14px;}
+  .sb-overlay{display:block;position:fixed;inset:0;background:rgba(43,33,26,.55);z-index:1100;opacity:0;visibility:hidden;transition:opacity .3s,visibility 0s linear .3s;}
+  .admin-layout.sb-open .sb-overlay{opacity:1;visibility:visible;transition:opacity .3s;}
+  .admin-content{width:100%;}
+  .admin-header-left h1{font-size:17px;}
+  .admin-header-left p{display:none;}
+}
+
+/* ---- Animasi tambahan ---- */
+@keyframes slideDown{from{opacity:0;transform:translateY(-14px);}to{opacity:1;transform:none;}}
+@keyframes slideRight{from{opacity:0;transform:translateX(-18px);}to{opacity:1;transform:none;}}
+@keyframes authIn{from{opacity:0;transform:translateY(26px) scale(.98);}to{opacity:1;transform:none;}}
+@keyframes donutIn{from{opacity:0;transform:rotate(-140deg) scale(.5);}to{opacity:1;transform:none;}}
+@keyframes bellWiggle{0%,100%{transform:rotate(0);}20%{transform:rotate(14deg);}40%{transform:rotate(-12deg);}60%{transform:rotate(8deg);}80%{transform:rotate(-5deg);}}
+@keyframes dotPulse{0%{box-shadow:0 0 0 0 rgba(62,122,78,.5);}100%{box-shadow:0 0 0 8px rgba(62,122,78,0);}}
+
+/* navbar & header admin turun halus */
+.navbar{animation:slideDown .5s cubic-bezier(.2,.7,.3,1) backwards;}
+.admin-header{animation:slideDown .5s cubic-bezier(.2,.7,.3,1) backwards;}
+
+/* halaman login / daftar / reset: kartu muncul, isi form naik bergantian */
+.auth-wrap{animation:authIn .6s cubic-bezier(.2,.7,.3,1) backwards;}
+.auth-form>*,.auth-side>*{animation:rise .55s cubic-bezier(.2,.7,.3,1) backwards;}
+.auth-form>*:nth-child(1),.auth-side>*:nth-child(1){animation-delay:.15s;}
+.auth-form>*:nth-child(2),.auth-side>*:nth-child(2){animation-delay:.22s;}
+.auth-form>*:nth-child(3),.auth-side>*:nth-child(3){animation-delay:.29s;}
+.auth-form>*:nth-child(4){animation-delay:.36s;}
+.auth-form>*:nth-child(5){animation-delay:.43s;}
+.auth-form>*:nth-child(6){animation-delay:.5s;}
+.auth-form>*:nth-child(n+7){animation-delay:.57s;}
+
+/* kolom isian: cincin fokus halus */
+.form-row input,.form-row select,.form-row textarea{transition:border-color .2s,box-shadow .2s;}
+.form-row input:focus,.form-row select:focus,.form-row textarea:focus{box-shadow:0 0 0 4px rgba(193,112,63,.15);}
+
+/* tombol utama: kilau lewat saat di-hover */
+.btn-primary{position:relative;overflow:hidden;}
+.btn-primary::after{content:"";position:absolute;top:0;left:-130%;width:55%;height:100%;background:linear-gradient(120deg,transparent,rgba(255,255,255,.38),transparent);transform:skewX(-20deg);transition:left .65s ease;pointer-events:none;}
+.btn-primary:hover::after{left:150%;}
+
+/* admin: menu sidebar masuk bergantian, geser sedikit saat di-hover */
+.sidebar-brand{animation:fadeIn .6s ease backwards;}
+.sidebar-nav a{animation:slideRight .45s cubic-bezier(.2,.7,.3,1) backwards;transition:background .2s,color .2s,transform .2s;}
+.sidebar-nav a:nth-child(1){animation-delay:.10s;}
+.sidebar-nav a:nth-child(2){animation-delay:.17s;}
+.sidebar-nav a:nth-child(3){animation-delay:.24s;}
+.sidebar-nav a:nth-child(4){animation-delay:.31s;}
+.sidebar-nav a:nth-child(n+5){animation-delay:.38s;}
+.sidebar-nav a:hover{transform:translateX(4px);}
+
+/* kartu statistik & diagram lingkaran */
+.kpi{transition:transform .25s,box-shadow .25s;}
+.kpi:hover{transform:translateY(-3px);box-shadow:0 10px 22px rgba(59,42,30,.10);}
+.donut{animation:donutIn .9s cubic-bezier(.2,.8,.3,1) backwards;}
+
+/* tabel: baris menyala saat di-hover */
+.table-wrap tbody tr{transition:background .15s;}
+.table-wrap tbody tr:hover{background:rgba(193,112,63,.06);}
+
+/* lonceng bergoyang, titik "Sistem Online" berdenyut */
+.bell-btn:hover svg{animation:bellWiggle .6s ease;transform-origin:50% 0;}
+.status-online::before{animation:dotPulse 1.8s ease-out infinite;}
