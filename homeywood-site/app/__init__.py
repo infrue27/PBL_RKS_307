@@ -6,6 +6,9 @@ from flask_login import current_user
 from config import Config
 from .extensions import db, login_manager
 
+import logging
+import sys
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALLOWED_PAGES = {
@@ -23,6 +26,12 @@ def create_app(config_class=Config):
         static_folder=None,
     )
     app.config.from_object(config_class)
+
+    if not app.debug:
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(logging.WARNING)
+        app.logger.addHandler(handler)
+        app.logger.setLevel(logging.WARNING)
 
     if os.environ.get("BEHIND_PROXY") == "1":
         from werkzeug.middleware.proxy_fix import ProxyFix
