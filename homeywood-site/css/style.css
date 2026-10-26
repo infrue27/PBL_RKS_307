@@ -574,10 +574,8 @@ body{transition:opacity .18s ease;}
 body.leaving{opacity:0;}
 .user-actions{display:flex;gap:8px;flex-wrap:nowrap;}
 
-/* ==========================================================================
-   TAMBAHAN: ikon mata (password), hamburger admin, animasi tambahan
-   ========================================================================== */
-
+/* ==== ikon mata (password), hamburger admin, animasi tambahan ==== */
+   
 /* ---- Ikon mata di kolom password ---- */
 .input-wrap.has-eye input{padding-right:46px !important;}
 .eye-btn{position:absolute;right:6px;top:50%;transform:translateY(-50%);width:36px;height:36px;display:flex;align-items:center;justify-content:center;border:none;background:transparent;color:var(--muted);border-radius:8px;cursor:pointer;transition:color .15s,background .15s;}

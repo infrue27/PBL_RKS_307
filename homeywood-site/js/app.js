@@ -493,7 +493,6 @@ async function removeFromCart(productId){
 }
 
 /* CHECKOUT */
-/* Ongkir: atur tarif di sini. Tarif dasar per wilayah, barang besar (sofa/lemari) lebih berat. */
 const ZONES=[
   {key:"batam",name:"Batam",rate:0,freeMin:0},
   {key:"sumatra",name:"Sumatra & Kepri lainnya",rate:350000,freeMin:10000000},
