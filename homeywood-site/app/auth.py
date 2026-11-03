@@ -80,6 +80,7 @@ def register():
         db.session.rollback()
         return jsonify({"error": "Email atau username sudah terdaftar."}), 409
 
+    current_app.logger.info("User baru terdaftar: %s", user.email)
     login_user(user)
     return jsonify({"user": user_to_dict(user)}), 201
 
@@ -102,6 +103,7 @@ def login():
     if not user.is_active:
         return jsonify({"error": "Akun ini dinonaktifkan. Hubungi admin."}), 403
 
+    current_app.logger.info("Login berhasil: %s", user.email)
     login_user(user)
     return jsonify({"user": user_to_dict(user)})
 
@@ -109,5 +111,6 @@ def login():
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
+    current_app.logger.info("Logout: %s", current_user.email)
     logout_user()
     return jsonify({"ok": True})

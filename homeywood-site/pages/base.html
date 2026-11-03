@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Homey Wood{% endblock %}</title>
+  <link rel="stylesheet" href="/css/style.css">
+</head>
+<body>
+  <div class="container" style="padding:24px 0">
+    <p>
+      {% if current_user.is_authenticated %}
+        Halo, {{ current_user.username }}
+        {% if current_user.is_admin %}<strong>(Admin)</strong>{% endif %}
+      {% else %}
+        Belum masuk. <a href="/login">Masuk</a>
+      {% endif %}
+      &middot; <a href="/home">Beranda</a>
+    </p>
+    {% block content %}{% endblock %}
+  </div>
+</body>
+</html>

@@ -1,0 +1,6 @@
+{% extends "base.html" %}
+{% block content %}
+  <h1>{{ p.name }}</h1>
+  <p>Rp {{ "{:,.0f}".format(p.price)|replace(",", ".") }}</p>
+  <a href="/produk">Kembali</a>
+{% endblock %}

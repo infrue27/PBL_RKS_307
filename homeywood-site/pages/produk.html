@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Daftar Produk - Homey Wood{% endblock %}
+{% block content %}
+<h1>Katalog Produk</h1>
+<p>Halaman ini dirender server-side dengan Jinja2 (extends, block, for, if).</p>
+<table>
+  <thead>
+    <tr><th>Nama</th><th>Kategori</th><th>Bahan</th><th>Harga</th><th>Stok</th></tr>
+  </thead>
+  <tbody>
+  {% for p in products %}
+    <tr>
+      <td><a href="{{ url_for('web.produk_detail', product_id=p.id) }}">{{ p.name }}</a></td>
+      <td>{{ p.category.name }}</td>
+      <td>{{ p.material or "-" }}</td>
+      <td>Rp {{ "{:,.0f}".format(p.price)|replace(",", ".") }}</td>
+      <td>{{ p.stock }}</td>
+    </tr>
+  {% else %}
+    <tr><td colspan="5">Belum ada produk.</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

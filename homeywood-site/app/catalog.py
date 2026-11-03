@@ -9,6 +9,7 @@ from .extensions import db
 from .models import Category, Product
 from .ratings import rating_data_for
 from .uploads import delete_upload, save_image, upload_url
+from .services import ProductService
 
 catalog_bp = Blueprint("catalog", __name__, url_prefix="/api")
 
@@ -136,13 +137,9 @@ def admin_create_product():
         except ValueError as e:
             return jsonify({"error": str(e)}), 400
 
-    product = Product(
-        category_id=category.id, name=name, slug=unique_slug(slugify(name)),
-        description=desc, price=price, stock=stock, material=material,
-        icon_emoji="🪵", image_path=image_path,
+    product = ProductService.create(
+        category, name, unique_slug(slugify(name)), desc, price, stock, material, image_path
     )
-    db.session.add(product)
-    db.session.commit()
     return jsonify({"product": product_to_dict(product)}), 201
 
 
@@ -199,6 +196,5 @@ def admin_update_product(product_id):
 @admin_required
 def admin_delete_product(product_id):
     product = Product.query.get_or_404(product_id)
-    product.is_active = False
-    db.session.commit()
+    ProductService.soft_delete(product)
     return jsonify({"ok": True})
