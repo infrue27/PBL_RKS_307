@@ -6,7 +6,7 @@ import requests
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
 
-from .extensions import db
+from .extensions import csrf, db
 from .models import Order, Payment, Product
 from .orders import save_payment_proof
 from .uploads import delete_upload
@@ -159,6 +159,7 @@ def upload_qris_proof(order_code):
 
 
 @midtrans_bp.route("/midtrans/notification", methods=["POST"])
+@csrf.exempt
 def notification():
     n = request.get_json(silent=True)
     if not isinstance(n, dict):

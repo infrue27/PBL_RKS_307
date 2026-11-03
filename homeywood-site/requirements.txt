@@ -8,3 +8,4 @@ requests
 openpyxl
 reportlab
 Flask-Migrate
+Flask-WTF
