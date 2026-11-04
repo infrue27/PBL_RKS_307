@@ -4,7 +4,7 @@ from flask import Flask, abort, redirect, request, send_from_directory
 from flask_login import current_user
 
 from config import Config
-from .extensions import db, login_manager
+from .extensions import db, login_manager, migrate, csrf
 
 import logging
 import sys
@@ -38,6 +38,9 @@ def create_app(config_class=Config):
         app.wsgi_app = ProxyFix(app.wsgi_app, x_for=1, x_proto=1, x_host=1)
 
     db.init_app(app)
+    from .extensions import csrf
+    csrf.init_app(app)
+    migrate.init_app(app, db)
     login_manager.init_app(app)
 
     from .models import User
@@ -155,4 +158,11 @@ def create_app(config_class=Config):
         resp.headers.setdefault("Referrer-Policy", "strict-origin-when-cross-origin")
         return resp
     
+    # --- Penyesuaian ATS: logging ke file + halaman Jinja2 ---
+    from .logging_setup import setup_file_logging
+    setup_file_logging(app)
+
+    from .web import web_bp
+    app.register_blueprint(web_bp)
+
     return app

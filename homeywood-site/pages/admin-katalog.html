@@ -22,15 +22,15 @@
         </div>
         <div class="card" id="addProductForm" style="display:none;margin-bottom:20px">
           <div class="two-col">
-            <div class="form-row"><label>Nama Produk</label><input id="apName"></div>
+            <div class="form-row"><label>Nama Produk</label><input required maxlength="150" id="apName"></div>
             <div class="form-row"><label>Kategori</label>
               <select id="apCat"><option>Sofa</option><option>Meja</option><option>Kursi</option><option>Lemari</option></select>
             </div>
             <div class="form-row"><label>Bahan / Material</label>
               <select id="apMat"><option>Kayu Jati</option><option>Kayu Mahoni</option><option>Rotan</option></select>
             </div>
-            <div class="form-row"><label>Harga (Rp)</label><input id="apPrice" type="number"></div>
-            <div class="form-row"><label>Stok</label><input id="apStock" type="number"></div>
+            <div class="form-row"><label>Harga (Rp)</label><input required min="0" max="1000000000" step="any" id="apPrice" type="number"></div>
+            <div class="form-row"><label>Stok</label><input required min="0" max="100000" step="1" id="apStock" type="number"></div>
           </div>
           <div class="form-row"><label>Deskripsi</label><textarea id="apDesc" rows="2"></textarea></div>
           <div class="form-row"><label>Foto Produk (JPG/PNG/WEBP, maks 2 MB)</label>

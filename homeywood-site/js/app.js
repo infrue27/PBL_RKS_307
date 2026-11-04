@@ -169,8 +169,17 @@ function adminHeaderHTML(title,subtitle){
 }
 
 /* AUTH */
+async function getCsrfToken(){
+  const r = await fetch("/api/csrf-token");
+  const d = await r.json();
+  return d.token;
+}
+
 async function apiRequest(method, url, body){
   const opts = { method, headers: {} };
+  if(method !== "GET"){
+    opts.headers["X-CSRFToken"] = await getCsrfToken();
+  }
   if(body instanceof FormData){
     opts.body = body; // upload file, biarkan browser yang mengisi Content-Type (multipart)
   } else if(body !== undefined){
@@ -184,7 +193,17 @@ async function apiRequest(method, url, body){
 }
 function apiPost(url, body){ return apiRequest("POST", url, body || {}); }
 
+/* Validasi client-side (HTML5): pakai atribut required/minlength/pattern/min/max pada input */
+function checkFields(ids){
+  for (const id of ids){
+    const el = document.getElementById(id);
+    if (el && !el.reportValidity()) return false;
+  }
+  return true;
+}
+
 async function doLogin(){
+  if(!checkFields(["loginEmail","loginPass"])) return;
   const email = document.getElementById("loginEmail").value.trim();
   const pass = document.getElementById("loginPass").value;
   if(!email||!pass){toast("Isi email dan password.");return;}
@@ -200,6 +219,7 @@ async function doLogin(){
 }
 
 async function doRegister(){
+  if(!checkFields(["regName","regUsername","regEmail","regPhone","regAddress","regPass","regPassConfirm"])) return;
   const full_name=document.getElementById("regName").value.trim();
   const username=document.getElementById("regUsername").value.trim();
   const email=document.getElementById("regEmail").value.trim();
@@ -932,6 +952,7 @@ function editProduct(id){
   window.scrollTo(0,0);
 }
 async function saveProduct(){
+  if(!checkFields(["apName","apPrice","apStock"])) return;
   const name=apName.value.trim(), cat=apCat.value, material=apMat.value, price=Number(apPrice.value), stock=Number(apStock.value), desc=apDesc.value.trim();
   if(!name||!price||apStock.value===""){ toast("Lengkapi data produk."); return; }
   const file=apImage.files&&apImage.files[0];
