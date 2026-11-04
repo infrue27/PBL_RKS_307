@@ -6,3 +6,4 @@ uploads/
 .vscode/
 logs/
 _backup_sebelum_patch/
+*.db
