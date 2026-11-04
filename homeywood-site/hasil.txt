@@ -1,0 +1,92 @@
+﻿
+app\admin_dashboard.py:5:from .catalog import admin_required
+app\admin_dashboard.py:10:admin_dashboard_bp = Blueprint("admin_dashboard", __name__, 
+url_prefix="/api")
+app\admin_dashboard.py:16:@admin_required
+app\admin_report.py:7:from .catalog import admin_required
+app\admin_report.py:12:admin_report_bp = Blueprint("admin_report", __name__, 
+url_prefix="/api")
+app\admin_report.py:133:@admin_required
+app\admin_report.py:142:@admin_required
+app\admin_report.py:204:@admin_required
+app\admin_users.py:5:from .catalog import admin_required
+app\admin_users.py:10:admin_users_bp = Blueprint("admin_users", __name__, 
+url_prefix="/api")
+app\admin_users.py:28:@admin_required
+app\admin_users.py:62:@admin_required
+app\admin_users.py:82:@admin_required
+app\auth.py:12:auth_bp = Blueprint("auth", __name__, url_prefix="/api")
+app\auth.py:83:    current_app.logger.info("User baru terdaftar: %s", user.email)
+app\auth.py:101:        current_app.logger.warning("Login gagal untuk %r dari %s", 
+email, request.remote_addr)
+app\auth.py:106:    current_app.logger.info("Login berhasil: %s", user.email)
+app\auth.py:114:    current_app.logger.info("Logout: %s", current_user.email)
+app\cart.py:8:cart_bp = Blueprint("cart", __name__, url_prefix="/api")
+app\catalog.py:14:catalog_bp = Blueprint("catalog", __name__, url_prefix="/api")
+app\catalog.py:17:def admin_required(fn):
+app\catalog.py:110:@admin_required
+app\catalog.py:147:@admin_required
+app\catalog.py:196:@admin_required
+app\extensions.py:4:from flask_wtf.csrf import CSRFProtect
+app\extensions.py:6:db = SQLAlchemy()
+app\extensions.py:10:migrate = Migrate()
+app\extensions.py:11:csrf = CSRFProtect()
+app\logging_setup.py:4:from logging.handlers import RotatingFileHandler
+app\logging_setup.py:10:    if any(isinstance(h, RotatingFileHandler) for h in 
+logger.handlers):
+app\logging_setup.py:15:        handler = RotatingFileHandler(
+app\logging_setup.py:20:        logger.warning("Logging ke file dinonaktifkan: %s", 
+exc)
+app\logging_setup.py:28:    logger.info("Aplikasi Homey Wood dijalankan")
+app\midtrans.py:14:midtrans_bp = Blueprint("midtrans", __name__, url_prefix="/api")
+app\midtrans.py:48:                current_app.logger.warning("Nominal Midtrans tidak 
+cocok untuk %s", order.order_code)
+app\midtrans.py:162:@csrf.exempt
+app\models.py:2:from werkzeug.security import check_password_hash, 
+generate_password_hash
+app\models.py:12:class User(UserMixin, db.Model):
+app\models.py:29:        self.password_hash = generate_password_hash(raw_password)
+app\models.py:32:        return check_password_hash(self.password_hash, raw_password)
+app\orders.py:12:from .catalog import admin_required
+app\orders.py:17:orders_bp = Blueprint("orders", __name__, url_prefix="/api")
+app\orders.py:312:@admin_required
+app\orders.py:319:@admin_required
+app\orders.py:354:@admin_required
+app\password_reset.py:21:reset_bp = Blueprint("password_reset", __name__, 
+url_prefix="/api")
+app\password_reset.py:105:                current_app.logger.warning(
+app\profile.py:8:profile_bp = Blueprint("profile", __name__, url_prefix="/api")
+app\reviews.py:11:reviews_bp = Blueprint("reviews", __name__, url_prefix="/api")
+app\services.py:9:class ProductService:
+app\services.py:28:        current_app.logger.info("Produk dibuat: %r oleh %s", 
+product.name, cls._actor())
+app\services.py:35:        current_app.logger.info("Produk dinonaktifkan: %r oleh 
+%s", product.name, cls._actor())
+app\web.py:2:from flask import Blueprint, jsonify, render_template
+app\web.py:7:web_bp = Blueprint("web", __name__)
+app\web.py:17:    return render_template("produk.html", products=products)
+app\web.py:23:    return render_template("produk_detail.html", p=p)
+app\__init__.py:21:def create_app(config_class=Config):
+app\__init__.py:42:    csrf.init_app(app)
+app\__init__.py:43:    migrate.init_app(app, db)
+app\__init__.py:61:    app.register_blueprint(auth_bp)
+app\__init__.py:64:    app.register_blueprint(reset_bp)
+app\__init__.py:67:    app.register_blueprint(catalog_bp)
+app\__init__.py:70:    app.register_blueprint(orders_bp)
+app\__init__.py:73:    app.register_blueprint(midtrans_bp)
+app\__init__.py:76:    app.register_blueprint(admin_users_bp)
+app\__init__.py:79:    app.register_blueprint(admin_report_bp)
+app\__init__.py:82:    app.register_blueprint(profile_bp)
+app\__init__.py:85:    app.register_blueprint(admin_dashboard_bp)
+app\__init__.py:88:    app.register_blueprint(cart_bp)
+app\__init__.py:91:    app.register_blueprint(reviews_bp)
+app\__init__.py:147:        from flask import render_template
+app\__init__.py:148:        return render_template(f"{page}.html")
+app\__init__.py:166:    app.register_blueprint(web_bp)
+pages\produk.html:1:{% extends "base.html" %}
+pages\produk.html:5:<p>Halaman ini dirender server-side dengan Jinja2 (extends, 
+block, for, if).</p>
+pages\produk_detail.html:1:{% extends "base.html" %}
+js\app.js:200:    if (el && !el.reportValidity()) return false;
+
+
