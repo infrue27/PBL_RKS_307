@@ -9,7 +9,7 @@ ORDER_STATUSES = (
 )
 
 
-class User(UserMixin, db.Model):
+class User(UserMixin, db.Model): #oop
     __tablename__ = "users"
 
     id = db.Column(db.Integer, primary_key=True)
@@ -26,7 +26,7 @@ class User(UserMixin, db.Model):
     updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
 
     def set_password(self, raw_password):
-        self.password_hash = generate_password_hash(raw_password)
+        self.password_hash = generate_password_hash(raw_password) #hasing23&32
 
     def check_password(self, raw_password):
         return check_password_hash(self.password_hash, raw_password)
@@ -46,7 +46,7 @@ class Category(db.Model):
     products = db.relationship("Product", back_populates="category")
 
 
-class Product(db.Model):
+class Product(db.Model): #SQLAlchemy
     __tablename__ = "products"
 
     id = db.Column(db.Integer, primary_key=True)
