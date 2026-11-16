@@ -681,3 +681,67 @@ body.leaving{opacity:0;}
 /* lonceng bergoyang, titik "Sistem Online" berdenyut */
 .bell-btn:hover svg{animation:bellWiggle .6s ease;transform-origin:50% 0;}
 .status-online::before{animation:dotPulse 1.8s ease-out infinite;}
+
+/* TOMBOL GANTI TEMA */
+.theme-btn{padding:0;color:var(--brown);transition:transform .2s,background .2s,border-color .2s;}
+.theme-btn:hover{border-color:var(--accent);}
+.theme-btn:active{transform:scale(.92);}
+.theme-btn:focus-visible{outline:2px solid var(--accent);outline-offset:2px;}
+.theme-btn svg{display:block;pointer-events:none;}
+.theme-btn .i-sun{display:none;}
+
+/* TEMA GELAP */
+html[data-theme="dark"]{
+  color-scheme:dark;
+  --brown-dark:#F3E9DA;
+  --brown:#D9C7AE;
+  --brown-light:#B59878;
+  --cream:#2d2620;
+  --cream-2:#2A2119;
+  --white:#211A14;
+  --accent-dark:#E8A06F;
+  --text:#F1E8DA;
+  --muted:#AE9C86;
+  --border:#3B3027;
+  --ok:#7FC08A;
+  --err:#E27468;
+}
+html[data-theme="dark"] .theme-btn .i-moon{display:none;}
+html[data-theme="dark"] .theme-btn .i-sun{display:block;}
+
+/* elemen yang memakai --brown-dark sebagai latar harus tetap gelap */
+html[data-theme="dark"] footer,
+html[data-theme="dark"] .admin-sidebar,
+html[data-theme="dark"] .admin-footer{background:#0F0B08;}
+html[data-theme="dark"] footer{border-top:1px solid var(--border);}
+html[data-theme="dark"] .kontak-info,
+html[data-theme="dark"] .flip-b{background:#33271D;}
+html[data-theme="dark"] .add-btn{background:var(--accent);}
+html[data-theme="dark"] .toast{background:#F3E9DA;color:#17120E;}
+
+/* tombol */
+html[data-theme="dark"] .btn-primary:hover{background:#A65A2E;}
+html[data-theme="dark"] .btn-outline:hover{background:var(--brown-dark);color:#17120E;}
+html[data-theme="dark"] .btn-danger{background:transparent;}
+html[data-theme="dark"] .btn-danger:hover{background:var(--err);color:#17120E;}
+
+/* kolom isian yang sebelumnya putih keras */
+html[data-theme="dark"] .comment-form input,
+html[data-theme="dark"] .zone-select,
+html[data-theme="dark"] #rvText{background:var(--white);}
+
+/* bintang kosong */
+html[data-theme="dark"] .star-pick span:not(.on){color:#4A3E33;}
+html[data-theme="dark"] .stars span{color:#4A3E33!important;}
+
+/* label status */
+html[data-theme="dark"] .status-pending{background:#3A2A1B;color:#E8A06F;}
+html[data-theme="dark"] .status-done,
+html[data-theme="dark"] .cod-note{background:#1F3322;color:#8FD19A;}
+html[data-theme="dark"] .status-rejected{background:#3C201C;color:#F08A7A;}
+html[data-theme="dark"] .status-ship{background:#1E2B3B;color:#8DB6E8;}
+html[data-theme="dark"] .status-online{background:#1F3322;color:#8FD19A;}
+html[data-theme="dark"] .status-online::before{background:#6FC07C;}
+
+/* warna hijau yang ditulis langsung di JS (status pembayaran) */
+html[data-theme="dark"] [style*="#2e7d32"]{color:#7FC08A!important;}
