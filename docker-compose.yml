@@ -1,0 +1,20 @@
+services:
+  web:
+    build:
+      context: ./homeywood-site
+      args:
+        UID: 1000
+    container_name: homeywood-web
+    restart: unless-stopped
+    env_file:
+      - ./homeywood-site/.env
+    environment:
+      BEHIND_PROXY: "1"
+      COOKIE_SECURE: "1"
+    ports:
+      - "8080:80"
+    volumes:
+      - ./homeywood-site/uploads:/app/uploads
+      - ./homeywood-site/logs:/app/logs
+    sysctls:
+      - net.ipv4.ip_unprivileged_port_start=0

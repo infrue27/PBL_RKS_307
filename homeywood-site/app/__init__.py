@@ -165,4 +165,8 @@ def create_app(config_class=Config):
     from .web import web_bp
     app.register_blueprint(web_bp)
 
+    @app.route('/health')
+    def health_check():
+        return "OK", 200
+
     return app
