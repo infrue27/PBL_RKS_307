@@ -1,5 +1,4 @@
 import re
-from collections import defaultdict
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required, login_user, logout_user
@@ -14,7 +13,6 @@ auth_bp = Blueprint("auth", __name__, url_prefix="/api")
 
 USERNAME_RE = re.compile(r"^[a-zA-Z0-9._]{3,30}$")
 
-failed_login_attempts = defaultdict(int)
 
 def user_to_dict(user):
     return {
@@ -52,7 +50,7 @@ def register():
 
     if not all([full_name, username, email, phone, address, password]):
         return jsonify({"error": "Lengkapi semua data terlebih dahulu."}), 400
-    if not USERNAME_RE.match(username):
+    if not USERNAME_RE.match(username): #Validasi53-59
         return jsonify({"error": "Username 3-30 karakter, hanya huruf/angka/titik/underscore."}), 400
     if any(w in username.lower() for w in ("admin", "homeywood", "penjual")):
         return jsonify({"error": "Username ini tidak tersedia, coba yang lain."}), 400
@@ -99,25 +97,12 @@ def login():
         return jsonify({"error": "Email atau password salah."}), 401
 
     user = User.query.filter(db.func.lower(User.email) == email).first()
-    
     if not user or not user.check_password(password):
-        failed_login_attempts[email] += 1
-        attempts = failed_login_attempts[email]
-        
-        if attempts % 5 == 0:
-            current_app.logger.warning("ALERT: Percobaan login gagal %d kali untuk %r dari IP %s", attempts, email, request.remote_addr)
-            
+        current_app.logger.warning("Login gagal untuk %r dari %s", email, request.remote_addr) #logging
         return jsonify({"error": "Email atau password salah."}), 401
-        
     if not user.is_active:
         return jsonify({"error": "Akun ini dinonaktifkan. Hubungi admin."}), 403
 
-    if email in failed_login_attempts:
-        del failed_login_attempts[email]
-
-    if user.role == "admin":
-        current_app.logger.warning("ALERT: Admin %s berhasil login dari IP %s", user.email, request.remote_addr)
-        
     login_user(user)
     return jsonify({"user": user_to_dict(user)})
 
@@ -125,8 +110,5 @@ def login():
 @auth_bp.route("/logout", methods=["POST"])
 @login_required
 def logout():
-    if current_user.role == "admin":
-        current_app.logger.warning("ALERT: Admin %s logout", current_user.email)
-        
     logout_user()
     return jsonify({"ok": True})
