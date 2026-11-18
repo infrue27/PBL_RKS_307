@@ -265,7 +265,13 @@ async function doRegister(){
   _authUser = data.user;
   document.getElementById("regPass").value="";
   document.getElementById("regPassConfirm").value="";
-  toast("Akun berhasil dibuat. Selamat datang, "+username+"!");
+  let welcomeMsg="Akun berhasil dibuat. Selamat datang, "+username+"!";
+  try{
+    const vd=await loadVouchers(true);
+    const nv=(vd.vouchers||[]).find(v=>v.type==="new_user");
+    if(nv) welcomeMsg+=" Kamu dapat voucher pengguna baru diskon "+nv.percent+"%!";
+  }catch(e){ /* info voucher hanya tambahan, abaikan kalau gagal */ }
+  toast(welcomeMsg);
   go("home");
 }
 
@@ -516,10 +522,18 @@ async function renderCart(){
       <div class="sum-row"><span>Subtotal</span><span>${fmt(cartTotal())}</span></div>
       <div class="sum-row"><span>Ongkos Kirim</span><span>Dihitung di checkout</span></div>
       <div class="sum-row total"><span>Total Sementara</span><span>${fmt(cartTotal())}</span></div>
+      <div id="cartVoucherHint"></div>
       <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="go('checkout')">Lanjut ke Checkout</button>
     </div>`;
   document.getElementById("cartLayout").innerHTML = `<div>${left}</div>${right}`;
   document.getElementById("footer-keranjang").innerHTML = footerHTML();
+  loadVouchers(true).then(d=>{
+    const el=document.getElementById("cartVoucherHint"); if(!el) return;
+    const ok=(d.vouchers||[]).filter(v=>v.eligible);
+    if(!ok.length) return;
+    const best=ok.reduce((a,b)=>b.discount>a.discount?b:a);
+    el.innerHTML=`<div class="vch-hint">🎟️ Kamu bisa hemat <b>${fmt(best.discount)}</b> dengan ${esc(best.name)}. Pilih di halaman checkout.</div>`;
+  });
 }
 async function updateCartQty(productId,d){
   const it=_cart.find(i=>i.productId===productId);
@@ -535,6 +549,58 @@ async function removeFromCart(productId){
   if(!ok){ toast(data.error || "Gagal menghapus produk."); return; }
   _cart=data.items; renderCart(); updateCartBadge();
   toast("Produk dihapus dari keranjang.");
+}
+
+/* VOUCHER (pengguna baru & tanggal kembar) -- aturan & perhitungan ada di server (app/vouchers.py) */
+let voucherData=null;     // hasil GET /api/vouchers, disimpan selama halaman terbuka
+let selectedVoucher;      // undefined = belum memilih (otomatis diskon terbesar), null = tanpa voucher
+async function loadVouchers(force){
+  if(voucherData && !force) return voucherData;
+  try{
+    const r=await fetch("/api/vouchers");
+    voucherData = r.ok ? await r.json() : {vouchers:[],nextTwinDate:null};
+  }catch(e){ voucherData={vouchers:[],nextTwinDate:null}; }
+  return voucherData;
+}
+function fmtDateID(iso){
+  return new Date(iso+"T00:00:00Z").toLocaleDateString("id-ID",{day:"numeric",month:"long",year:"numeric",timeZone:"UTC"});
+}
+function voucherDesc(v){
+  return "Diskon "+v.percent+"% (maks. "+fmt(v.maxDiscount)+")"
+    +(v.minPurchase?" · min. belanja "+fmt(v.minPurchase):"")
+    +" · berlaku s/d "+fmtDateID(v.validUntil);
+}
+function currentVoucher(){
+  if(selectedVoucher===null) return null;
+  const ok=((voucherData&&voucherData.vouchers)||[]).filter(v=>v.eligible);
+  if(selectedVoucher) return ok.find(v=>v.code===selectedVoucher)||null;
+  return ok.slice().sort((a,b)=>b.discount-a.discount)[0]||null;
+}
+function chooseVoucher(code){ selectedVoucher=code||null; renderCheckout(); }
+function renderVoucherBox(){
+  const vs=(voucherData&&voucherData.vouchers)||[];
+  const cur=currentVoucher();
+  const rows=vs.map(v=>`
+    <label class="pay-option voucher-opt ${v.eligible?'':'disabled'}">
+      <input type="radio" name="vch" ${v.eligible?'':'disabled'} ${cur&&cur.code===v.code?'checked':''} onchange="chooseVoucher('${esc(v.code)}')">
+      <div class="vch-body">
+        <div><b>${esc(v.name)}</b><span class="vch-tag">${esc(v.code)}</span></div>
+        <div class="muted vch-desc">${voucherDesc(v)}</div>
+        ${v.eligible ? `<div class="vch-save">Hemat ${fmt(v.discount)}</div>` : `<div class="vch-why">${esc(v.reason||"")}</div>`}
+      </div>
+    </label>`).join("");
+  const none = vs.some(v=>v.eligible) ? `
+    <label class="pay-option">
+      <input type="radio" name="vch" ${cur?'':'checked'} onchange="chooseVoucher(null)"> Tanpa voucher
+    </label>` : "";
+  const hasTwin=vs.some(v=>v.type==="twin_date");
+  const teaser = (!hasTwin && voucherData && voucherData.nextTwinDate)
+    ? `<p class="vch-note">🎉 Voucher Tanggal Kembar aktif setiap tanggal 1/1, 2/2 sampai 12/12. Berikutnya: <b>${fmtDateID(voucherData.nextTwinDate)}</b>.</p>` : "";
+  const empty = vs.length ? "" : `<p class="vch-note" style="margin-top:0">Belum ada voucher yang berlaku untuk akunmu saat ini.</p>`;
+  return `<div class="card" style="margin-top:16px">
+      <h3 style="margin-top:0">3. Voucher Diskon</h3>
+      ${empty}${rows}${none}${teaser}
+    </div>`;
 }
 
 /* CHECKOUT */
@@ -635,6 +701,9 @@ function renderQrisBox(){
 async function renderCheckout(){
   if(!requireLogin()) return;
   await fetchProductList();
+  await loadVouchers();
+  const vch=currentVoucher();
+  const discount=vch?vch.discount:0;
   const items=cartWithDetails();
   const u=currentUser();
   const ship=calcShipping(items);
@@ -655,13 +724,15 @@ async function renderCheckout(){
       ${selectedPayment==="Transfer Bank" ? renderBankChooser() : ""}
       ${selectedPayment==="QRIS" ? renderQrisBox() : ""}
       ${selectedPayment==="QRIS" ? "" : selectedPayment!=="Bayar di Tempat (COD)" ? renderProofBox() : `<p class="cod-note">💵 COD: bayar tunai saat barang tiba. Tidak perlu unggah bukti pembayaran.</p>`}
-    </div>`;
+    </div>
+    ${renderVoucherBox()}`;
   const right = `<div class="cart-summary">
-      <h3 style="margin-top:0">3. Ringkasan Pesanan</h3>
+      <h3 style="margin-top:0">4. Ringkasan Pesanan</h3>
       ${items.map(i=>`<div class="sum-row"><span>${esc(i.product.name)} x${i.qty}</span><span>${fmt(i.product.price*i.qty)}</span></div>`).join("")}
       <div class="sum-row"><span>Subtotal</span><span>${fmt(cartTotal())}</span></div>
       <div class="sum-row"><span>Ongkos Kirim (${ship.zone.name})</span><span>${ship.free?'<b style="color:var(--ok)">Gratis</b>':fmt(ship.fee)}</span></div>
-      <div class="sum-row total"><span>Total Bayar</span><span>${fmt(cartTotal()+ship.fee)}</span></div>
+      ${vch?`<div class="sum-row vch-row"><span>Diskon voucher</span><span>−${fmt(discount)}</span></div>`:""}
+      <div class="sum-row total"><span>Total Bayar</span><span>${fmt(cartTotal()-discount+ship.fee)}</span></div>
       <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="placeOrder()">Buat Pesanan</button>
     </div>`;
   document.getElementById("checkoutLayout").innerHTML = `<div>${left}</div>${right}`;
@@ -681,8 +752,10 @@ async function placeOrder(){
   let paymentLabel=selectedPayment;
   if(selectedPayment==="Transfer Bank") paymentLabel="Transfer Bank "+BANKS.find(b=>b.code===selectedBank).name+" (VA: "+getVA(selectedBank)+")";
 
+  const vch=currentVoucher();
   const payload = {
     items: items.map(i=>({productId:i.productId, qty:i.qty})), // harga/nama TIDAK dikirim -- server yang tentukan dari database
+    voucher_code: vch ? vch.code : null,                       // nominal diskon juga dihitung ulang di server
     zone: selectedZone,
     payment_method: selectedPayment,
     payment_label: paymentLabel,
@@ -696,6 +769,7 @@ async function placeOrder(){
     placingOrder=false;
     if(btn){ btn.disabled=false; btn.textContent="Buat Pesanan"; }
     toast(data.error || "Gagal membuat pesanan.");
+    if(vch){ voucherData=null; selectedVoucher=undefined; renderCheckout(); }  // voucher mungkin sudah tidak berlaku: muat ulang daftarnya
     return;
   }
 
@@ -818,6 +892,18 @@ async function renderProfile(){
   const orderRes = await fetch("/api/orders");
   const orderData = await orderRes.json();
   const myOrders = orderRes.ok ? (orderData.orders || []) : [];
+  const vd = await loadVouchers(true);
+  const myVouchers = vd.vouchers || [];
+  const voucherSection = `<h3>Voucher Saya</h3>` + (myVouchers.length
+    ? myVouchers.map(v=>`
+      <div class="order-row">
+        <div>
+          <div style="font-weight:600;font-size:14px">${esc(v.name)}<span class="vch-tag">${esc(v.code)}</span></div>
+          <div class="muted vch-desc">${voucherDesc(v)}</div>
+        </div>
+        <div style="text-align:right"><span class="status-pill ${v.used?'status-pending':'status-done'}">${v.used?'Sudah dipakai':'Tersedia'}</span></div>
+      </div>`).join("")
+    : `<p class="muted" style="font-size:13px;margin-top:0">Belum ada voucher aktif.${vd.nextTwinDate?` Voucher Tanggal Kembar berikutnya: <b>${fmtDateID(vd.nextTwinDate)}</b>.`:""}</p>`);
   const infoCard = profileEditing ? `
     <div class="card" style="margin-bottom:24px">
       <h3 style="margin-top:0">Edit Informasi Pribadi</h3>
@@ -855,7 +941,8 @@ async function renderProfile(){
       </div>
     </div>
     ${infoCard}
-    <h3>Riwayat Pembelian</h3>
+    ${voucherSection}
+    <h3 style="margin-top:28px">Riwayat Pembelian</h3>
     ${myOrders.length===0 ? `<div class="empty-state"><div>📦</div>Belum ada riwayat pembelian.</div>` :
       myOrders.map(o=>`
       <div class="order-row">
@@ -866,6 +953,7 @@ async function renderProfile(){
         <div style="text-align:right">
           <div style="font-weight:700;margin-bottom:2px">${fmt(o.total)}</div>
           ${o.shipping!=null?`<div class="muted" style="font-size:11.5px;margin-bottom:6px">incl. ongkir ${o.shipping?fmt(o.shipping):"gratis"}</div>`:""}
+          ${o.discount>0?`<div class="vch-order">🎟️ ${esc(o.voucherName||o.voucher)} −${fmt(o.discount)}</div>`:""}
           <span class="status-pill ${statusClass(o.status)}">${o.status}</span>
         </div>
         ${orderActionsHTML(o)}
@@ -1086,6 +1174,7 @@ async function renderAdminVerifikasi(){
         <div style="font-weight:600">${o.id} · ${o.recipient?esc(o.recipient.name):(o.buyer?esc(o.buyer.name):'-')}${o.buyer?` <span class="muted" style="font-weight:400;font-size:12px">@${esc(o.buyer.username)}</span>`:''}</div>
         ${o.recipient?`<div style="font-size:12.5px;color:var(--muted)">📍 ${esc(o.recipient.phone)} · ${esc(o.recipient.address)}</div>`:''}
         <div style="font-size:12.5px;color:var(--muted)">${o.items.map(i=>esc(i.name)+" x"+i.qty).join(", ")} · ${esc(o.payment||'')}</div>
+        ${o.discount>0?`<div class="vch-order" style="margin-top:4px">🎟️ Voucher ${esc(o.voucher)} · potongan ${fmt(o.discount)}</div>`:''}
         ${o.proof?`<img class="proof-thumb" src="${o.proof}" onclick="viewProof('${o.id}')" title="Klik untuk memperbesar">`:`<div style="font-size:12px;color:var(--muted);margin-top:6px">${/COD/.test(o.payment||"")?"COD · tanpa bukti":"Bukti tidak tersedia"}</div>`}
       </div>
       <div style="text-align:right"><div style="font-weight:700;margin-bottom:8px">${fmt(o.total)}</div>${actions} <button class="btn btn-outline btn-sm" onclick="printLabel('${o.id}')">🖨️ Label pengiriman</button></div>

@@ -23,3 +23,12 @@ Buka index.html (atau pages/home.html) dengan klik dua kali. Tidak perlu server.
   Tambahkan di `.env` (opsional saat development; tanpa MAIL_HOST link dicetak di terminal):
   `MAIL_HOST`, `MAIL_PORT`, `MAIL_USER`, `MAIL_PASSWORD`, `MAIL_FROM`, `APP_BASE_URL` (mis. https://homeywood.com)
 - Di website yang tampil = username. Nama lengkap dipakai untuk penerima di checkout dan label pengiriman (admin > Verifikasi > tombol Label pengiriman).
+
+## Update: voucher diskon (pengguna baru & tanggal kembar)
+- Jalankan `migration_007_voucher.sql` di database yang sudah ada (atau `python migrasi.py upgrade` jika memakai Flask-Migrate; revisinya aman dijalankan walau SQL-nya sudah dipakai).
+- **Voucher Pengguna Baru** (`WELCOME`): otomatis didapat saat daftar, berlaku 30 hari, sekali pakai.
+- **Voucher Tanggal Kembar** (`KEMBAR-YYYY-MM-DD`): aktif otomatis pada tanggal kembar 1/1, 2/2 ... 12/12 (zona WIB), sekali pakai per tanggal.
+- Persen, maksimal diskon, minimal belanja, dan masa berlaku diatur di konstanta `NEW_USER` dan `TWIN_DATE` pada `app/vouchers.py`.
+- Diskon dihitung dari subtotal barang (ongkir tidak didiskon) dan satu pesanan hanya boleh satu voucher. Semua perhitungan divalidasi ulang di server.
+- Kalau pesanan ditolak/dibatalkan/kedaluwarsa, voucher otomatis bisa dipakai lagi.
+- Laporan penjualan menambah baris "Diskon voucher" supaya total tetap cocok (barang + ongkir - diskon).

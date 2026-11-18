@@ -13,6 +13,7 @@ from .catalog import admin_required
 from .extensions import db
 from .models import CartItem, Order, OrderItem, Payment, Product
 from .uploads import decode_data_url, save_image_bytes
+from .vouchers import VoucherError, validate_for_order, voucher_label
 
 orders_bp = Blueprint("orders", __name__, url_prefix="/api")
 
@@ -144,7 +145,8 @@ def save_payment_proof(data_url, order_code):
 
 def order_to_dict(order):
     subtotal = sum(float(i.subtotal) for i in order.items)
-    shipping = float(order.total_amount) - subtotal
+    discount = float(order.discount_amount or 0)
+    shipping = float(order.total_amount) - subtotal + discount
     proof_url = f"/uploads/{order.payment.proof_path}" if order.payment and order.payment.proof_path else None
     reviewed_ids = {r.product_id for r in order.reviews}
     return {
@@ -157,6 +159,9 @@ def order_to_dict(order):
         ],
         "subtotal": subtotal,
         "shipping": shipping,
+        "discount": discount,
+        "voucher": order.voucher_code,
+        "voucherName": voucher_label(order.voucher_code),
         "total": float(order.total_amount),
         "payment": order.payment_label,
         "proof": proof_url,
@@ -253,12 +258,23 @@ def create_order():
 
     zone, shipping_fee = calc_shipping(resolved, zone_key)
     subtotal = sum((p.price * qty for p, qty in resolved), Decimal("0"))
-    total = subtotal + Decimal(shipping_fee)
+
+    voucher_code = str(data.get("voucher_code") or "").strip().upper() or None
+    discount = Decimal("0")
+    if voucher_code:
+        try:
+            voucher, discount = validate_for_order(current_user, voucher_code, subtotal)
+        except VoucherError as e:
+            db.session.rollback()
+            return jsonify({"error": str(e)}), 400
+    total = subtotal - discount + Decimal(shipping_fee)
 
     order = Order(
         order_code=gen_order_code(),
         user_id=current_user.id,
         total_amount=total,
+        voucher_code=voucher_code if discount > 0 else None,
+        discount_amount=discount,
         shipping_address=current_user.address or "-",
         recipient_name=current_user.full_name,
         recipient_phone=current_user.phone,
