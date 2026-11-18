@@ -7,19 +7,29 @@
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🪵</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>try{if(localStorage.getItem("hw_theme")==="dark")document.documentElement.setAttribute("data-theme","dark")}catch(e){}</script>
 <link rel="stylesheet" href="../css/style.css">
 </head>
-<body data-page="admin-verifikasi">
+<body data-page="admin-user">
 
-<section class="page active" id="page-admin-verifikasi">
+<section class="page active" id="page-admin-user">
   <div class="admin-layout">
-    <aside class="admin-sidebar" id="adminSidebar3"></aside>
+    <aside class="admin-sidebar" id="adminSidebar4"></aside>
     <div class="admin-content">
-      <div class="admin-header" id="adminHeader3"></div>
+      <div class="admin-header" id="adminHeader4"></div>
       <main class="admin-main">
-        <div id="verifList"></div>
+        <div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap">
+          <input id="userSearch" placeholder="Cari nama, email, atau username..." oninput="onUserSearchInput()"
+           style="flex:1;min-width:220px;padding:10px 12px;border:1px solid #D9CDB8;border-radius:8px;font:inherit">
+          <select id="userStatus" class="zone-select" onchange="loadAdminUsers()" style="max-width:180px">
+            <option value="all">Semua status</option>
+            <option value="active">Aktif</option>
+            <option value="inactive">Nonaktif</option>
+          </select>
+        </div>
+        <div class="table-wrap"><table id="adminUserTable"><thead><tr><th>Nama</th><th>Email</th><th>No. WhatsApp</th><th>Alamat</th><th>Tanggal Daftar</th><th>Order</th><th>Status</th><th>Aksi</th></tr></thead><tbody></tbody></table></div>
       </main>
-      <div id="footer-admin-verifikasi"></div>
+      <div id="footer-admin-user"></div>
     </div>
   </div>
 </section>
