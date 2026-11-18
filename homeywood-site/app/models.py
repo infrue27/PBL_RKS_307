@@ -1,4 +1,5 @@
 from flask_login import UserMixin
+from sqlalchemy.dialects.mysql import TINYINT
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from .extensions import db
@@ -22,8 +23,8 @@ class User(UserMixin, db.Model): #oop
     role = db.Column(db.Enum("admin", "customer"), nullable=False, default="customer")
     avatar_path = db.Column(db.String(255))
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False, onupdate=db.func.now())
 
     def set_password(self, raw_password):
         self.password_hash = generate_password_hash(raw_password) #hasing23&32
@@ -48,6 +49,11 @@ class Category(db.Model):
 
 class Product(db.Model): #SQLAlchemy
     __tablename__ = "products"
+    __table_args__ = (
+        db.Index("idx_products_category", "category_id"),
+        db.Index("idx_products_price", "price"),
+        db.Index("ft_products_search", "name", "description", mysql_prefix="FULLTEXT"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     category_id = db.Column(db.Integer, db.ForeignKey("categories.id"), nullable=False)
@@ -60,8 +66,8 @@ class Product(db.Model): #SQLAlchemy
     image_path = db.Column(db.String(255))
     icon_emoji = db.Column(db.String(10))
     is_active = db.Column(db.Boolean, nullable=False, default=True)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False, onupdate=db.func.now())
 
     category = db.relationship("Category", back_populates="products")
     reviews = db.relationship("Review", back_populates="product", cascade="all, delete-orphan")
@@ -69,15 +75,18 @@ class Product(db.Model): #SQLAlchemy
 
 class Review(db.Model):
     __tablename__ = "reviews"
-    __table_args__ = (db.UniqueConstraint("order_id", "product_id", name="uq_review_order_product"),)
+    __table_args__ = (
+        db.UniqueConstraint("order_id", "product_id", name="uq_review_order_product"),
+        db.Index("idx_reviews_product", "product_id"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="SET NULL"))
-    rating = db.Column(db.SmallInteger, nullable=False)
+    rating = db.Column(TINYINT(unsigned=True), nullable=False)
     comment = db.Column(db.Text)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
     product = db.relationship("Product", back_populates="reviews")
     user = db.relationship("User")
@@ -90,6 +99,7 @@ class Review(db.Model):
 
 class ReviewImage(db.Model):
     __tablename__ = "review_images"
+    __table_args__ = (db.Index("idx_review_images_review", "review_id"),)
 
     id = db.Column(db.Integer, primary_key=True)
     review_id = db.Column(db.Integer, db.ForeignKey("reviews.id", ondelete="CASCADE"), nullable=False)
@@ -100,12 +110,13 @@ class ReviewImage(db.Model):
 
 class ReviewComment(db.Model):
     __tablename__ = "review_comments"
+    __table_args__ = (db.Index("idx_review_comments_review", "review_id"),)
 
     id = db.Column(db.Integer, primary_key=True)
     review_id = db.Column(db.Integer, db.ForeignKey("reviews.id", ondelete="CASCADE"), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     comment = db.Column(db.String(200), nullable=False)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
     review = db.relationship("Review", back_populates="comments")
     user = db.relationship("User")
@@ -119,7 +130,7 @@ class CartItem(db.Model):
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
     quantity = db.Column(db.Integer, nullable=False, default=1)
-    added_at = db.Column(db.DateTime, server_default=db.func.now())
+    added_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
     user = db.relationship("User")
     product = db.relationship("Product")
@@ -127,6 +138,11 @@ class CartItem(db.Model):
 
 class Order(db.Model):
     __tablename__ = "orders"
+    __table_args__ = (
+        db.Index("idx_orders_user", "user_id"),
+        db.Index("idx_orders_status", "status"),
+        db.Index("idx_orders_created", "created_at"),
+    )
 
     id = db.Column(db.Integer, primary_key=True)
     order_code = db.Column(db.String(30), unique=True, nullable=False)
@@ -138,8 +154,8 @@ class Order(db.Model):
     payment_label = db.Column(db.String(100))
     reviews = db.relationship("Review", back_populates="order")
     status = db.Column(db.Enum(*ORDER_STATUSES), nullable=False, default="menunggu_pembayaran")
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
-    updated_at = db.Column(db.DateTime, server_default=db.func.now(), onupdate=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
+    updated_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False, onupdate=db.func.now())
 
     user = db.relationship("User", backref="orders")
     items = db.relationship("OrderItem", back_populates="order", cascade="all, delete-orphan")
@@ -148,6 +164,7 @@ class Order(db.Model):
 
 class OrderItem(db.Model):
     __tablename__ = "order_items"
+    __table_args__ = (db.Index("idx_items_order", "order_id"),)
 
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="CASCADE"), nullable=False)
@@ -163,6 +180,7 @@ class OrderItem(db.Model):
 
 class Payment(db.Model):
     __tablename__ = "payments"
+    __table_args__ = (db.Index("idx_payments_status", "status"),)
 
     id = db.Column(db.Integer, primary_key=True)
     order_id = db.Column(db.Integer, db.ForeignKey("orders.id", ondelete="CASCADE"), unique=True, nullable=False)
@@ -173,7 +191,7 @@ class Payment(db.Model):
     status = db.Column(db.Enum("pending", "approved", "rejected"), nullable=False, default="pending")
     admin_note = db.Column(db.String(255))
     verified_by = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="SET NULL"))
-    uploaded_at = db.Column(db.DateTime, server_default=db.func.now())
+    uploaded_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
     verified_at = db.Column(db.DateTime)
 
     order = db.relationship("Order", back_populates="payment")
@@ -182,12 +200,13 @@ class Payment(db.Model):
 
 class PasswordReset(db.Model):
     __tablename__ = "password_resets"
+    __table_args__ = (db.Index("idx_pwreset_user", "user_id"),)
 
     id = db.Column(db.Integer, primary_key=True)
     user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
-    token_hash = db.Column(db.String(64), unique=True, nullable=False)
+    token_hash = db.Column(db.CHAR(64), unique=True, nullable=False)
     expires_at = db.Column(db.DateTime, nullable=False)
     used_at = db.Column(db.DateTime)
-    created_at = db.Column(db.DateTime, server_default=db.func.now())
+    created_at = db.Column(db.DateTime, server_default=db.func.now(), nullable=False)
 
     user = db.relationship("User")
