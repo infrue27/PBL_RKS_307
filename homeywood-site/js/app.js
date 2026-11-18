@@ -67,6 +67,30 @@ function toast(msg){
   window._toastTimer=setTimeout(()=>t.style.display="none",2200);
 }
 
+/* TEMA GELAP / TERANG (pilihan disimpan di localStorage "hw_theme") */
+function isDarkTheme(){ return document.documentElement.getAttribute("data-theme")==="dark"; }
+function applyTheme(dark){
+  if(dark) document.documentElement.setAttribute("data-theme","dark");
+  else document.documentElement.removeAttribute("data-theme");
+  document.querySelectorAll(".theme-btn").forEach(b=>{
+    b.setAttribute("aria-pressed",String(dark));
+    b.title = dark ? "Ganti ke tema terang" : "Ganti ke tema gelap";
+  });
+}
+function toggleTheme(){
+  const dark = !isDarkTheme();
+  applyTheme(dark);
+  try{ if(dark) localStorage.setItem("hw_theme","dark"); else localStorage.removeItem("hw_theme"); }catch(e){}
+}
+window.addEventListener("storage",e=>{ if(e.key==="hw_theme") applyTheme(e.newValue==="dark"); });  // sinkron antar tab
+function themeBtnHTML(){
+  const dark = isDarkTheme();
+  return `<button type="button" class="icon-btn theme-btn" onclick="toggleTheme()" aria-label="Ganti tema terang/gelap" aria-pressed="${dark}" title="${dark?'Ganti ke tema terang':'Ganti ke tema gelap'}">
+        <svg class="i-moon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        <svg class="i-sun" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg>
+      </button>`;
+}
+
 /* NAV / ROUTER */
 function showPage(page){
   document.querySelectorAll(".page").forEach(p=>p.classList.remove("active"));
@@ -164,6 +188,7 @@ function adminHeaderHTML(title,subtitle){
     </div>
     <div class="admin-header-right">
       <div class="status-online">Sistem Online</div>
+      ${themeBtnHTML()}
       <div class="bell-btn">${ICONS.bell}</div>
     </div>`;
 }
@@ -699,7 +724,7 @@ async function payWithQris(orderCode){
   if(!ok){ toast(data.error||"Gagal membuat QRIS."); go("profile"); return; }
   const m=document.createElement("div");
   m.className="modal-back"; m.id="qrisModal";
-  m.innerHTML=`<div style="background:#fff;border-radius:14px;padding:22px;max-width:440px;width:100%;text-align:center;max-height:90vh;overflow:auto">
+  m.innerHTML=`<div style="background:#fff;color:#2B211A;border-radius:14px;padding:22px;max-width:440px;width:100%;text-align:center;max-height:90vh;overflow:auto">
     <h3 style="margin-top:0">Scan QRIS untuk membayar</h3>
     <div style="display:flex;justify-content:center;margin:8px 0 4px">
       <div style="background:#fff;padding:10px;border:1px solid #E6DAC6;border-radius:12px;line-height:0">
@@ -1244,6 +1269,7 @@ const NAVBAR_HTML = `<nav class="navbar">
       <li onclick="go('kontak')" data-nav="kontak">Kontak</li>
     </ul>
     <div class="nav-right">
+      ${themeBtnHTML()}
       <div class="icon-btn" onclick="go('keranjang')" id="cartIconWrap">🛒<span class="badge" id="cartBadge" style="display:none">0</span></div>
       <div class="dropdown" id="profileDropdown">
         <div class="icon-btn" onclick="onProfileIconClick()">👤</div>
