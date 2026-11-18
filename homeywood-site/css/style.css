@@ -745,3 +745,17 @@ html[data-theme="dark"] .status-online::before{background:#6FC07C;}
 
 /* warna hijau yang ditulis langsung di JS (status pembayaran) */
 html[data-theme="dark"] [style*="#2e7d32"]{color:#7FC08A!important;}
+
+/* ---- Voucher diskon ---- */
+.voucher-opt{align-items:flex-start;}
+.voucher-opt input{margin-top:4px;}
+.voucher-opt.disabled{opacity:.6;cursor:not-allowed;}
+.vch-body{flex:1;min-width:0;}
+.vch-tag{display:inline-block;font-size:11px;font-weight:700;letter-spacing:.4px;padding:2px 8px;margin-left:8px;border-radius:999px;background:var(--cream);border:1px dashed var(--accent);color:var(--accent-dark);vertical-align:1px;word-break:break-all;}
+.vch-desc{font-size:12.5px;margin-top:2px;}
+.vch-save{font-size:13px;font-weight:600;color:var(--ok);margin-top:4px;}
+.vch-why{font-size:12.5px;color:var(--err);margin-top:4px;}
+.vch-note{font-size:12.5px;color:var(--muted);margin:12px 0 0;}
+.sum-row.vch-row{color:var(--ok);font-weight:600;}
+.vch-hint{font-size:13px;background:var(--cream);border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin:4px 0 10px;color:var(--brown);}
+.vch-order{font-size:11.5px;font-weight:600;color:var(--ok);margin-bottom:6px;}

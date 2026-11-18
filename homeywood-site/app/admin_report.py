@@ -86,10 +86,17 @@ def build_report(d_from, d_to):
     active = User.query.filter_by(role="customer", is_active=True).count()
     inactive = User.query.filter_by(role="customer", is_active=False).count()
 
-    ship_total = total_revenue - sum(r["revenue"] for r in recap)
+    discount_total = float(
+        db.session.query(func.coalesce(func.sum(Order.discount_amount), 0)).filter(in_range).scalar() or 0
+    )
+    # total = barang + ongkir - diskon voucher  =>  ongkir = total + diskon - barang
+    ship_total = total_revenue + discount_total - sum(r["revenue"] for r in recap)
     recap_table = recap + (
         [{"name": "Ongkos kirim", "qty": 0, "orders": 0, "revenue": ship_total}]
         if ship_total > 0.5 else []
+    ) + (
+        [{"name": "Diskon voucher", "qty": 0, "orders": 0, "revenue": -discount_total}]
+        if discount_total > 0.5 else []
     )
 
     return {
