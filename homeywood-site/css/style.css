@@ -759,3 +759,18 @@ html[data-theme="dark"] [style*="#2e7d32"]{color:#7FC08A!important;}
 .sum-row.vch-row{color:var(--ok);font-weight:600;}
 .vch-hint{font-size:13px;background:var(--cream);border:1px dashed var(--accent);border-radius:10px;padding:10px 12px;margin:4px 0 10px;color:var(--brown);}
 .vch-order{font-size:11.5px;font-weight:600;color:var(--ok);margin-bottom:6px;}
+
+/* ---- Favorit & estimasi tiba ---- */
+.pcard{position:relative;}
+.fav-btn{position:absolute;top:10px;right:10px;z-index:2;width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.92);color:var(--brown-dark);font-size:19px;line-height:1;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 8px rgba(59,42,30,.2);cursor:pointer;transition:transform .15s,color .15s;}
+.fav-btn:hover{transform:scale(1.1);}
+.fav-btn:active{transform:scale(.9);}
+.fav-btn.on{color:var(--err);}
+html[data-theme="dark"] .fav-btn{background:rgba(30,24,20,.85);color:#EADBC8;}
+html[data-theme="dark"] .fav-btn.on{color:#E0705F;}
+.fav-detail.on{border-color:var(--err);color:var(--err);}
+.fav-detail.on:hover{background:var(--err);color:#fff;}
+.eta-box{margin-top:12px;padding:10px 12px;border-radius:8px;background:var(--cream-2);font-size:13.5px;color:var(--brown);}
+.eta-box .muted{font-size:12px;margin-top:4px;}
+.order-eta{font-size:12.5px;font-weight:600;color:var(--accent-dark);margin-top:4px;}
+@media (prefers-reduced-motion:reduce){.fav-btn:hover,.fav-btn:active{transform:none;}}
