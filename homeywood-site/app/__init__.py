@@ -13,7 +13,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 ALLOWED_PAGES = {
     "home", "katalog", "detail", "keranjang", "checkout", "profile",
-    "kontak", "tentang", "login", "register", "lupa-password", "reset-password",
+        "kontak", "tentang", "favorit", "login", "register", "lupa-password", "reset-password",
     "admin-dashboard", "admin-katalog", "admin-user", "admin-verifikasi",
 }
 
@@ -92,6 +92,9 @@ def create_app(config_class=Config):
 
     from .reviews import reviews_bp
     app.register_blueprint(reviews_bp)
+
+    from .favorites import favorites_bp
+    app.register_blueprint(favorites_bp)
 
     app.config["UPLOAD_ROOT"] = os.path.join(BASE_DIR, app.config.get("UPLOAD_FOLDER", "uploads"))
     os.makedirs(app.config["UPLOAD_ROOT"], exist_ok=True)
