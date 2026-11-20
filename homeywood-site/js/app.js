@@ -106,6 +106,7 @@ function showPage(page){
   if(page==="home") renderHome();
   if(page==="katalog") renderKatalog();
   if(page==="detail") renderDetail();
+  if(page==="favorit") renderFavorit();
   if(page==="keranjang") renderCart();
   if(page==="checkout") renderCheckout();
   if(page==="profile") renderProfile();
@@ -138,6 +139,7 @@ function renderNavbar(){
   if(u){
     menu.innerHTML = `<div class="who">Halo, <b>${esc(displayName(u))}</b></div>
       <a onclick="go('profile')">Profil Saya</a>
+      <a onclick="go('favorit')">Favorit Saya</a>
       <a onclick="go('keranjang')">Keranjang Saya</a>
       <button onclick="logout()">Keluar</button>`;
   } else {
@@ -389,12 +391,62 @@ function orderActionsHTML(o){
   }
   return h? `<div class="order-actions">${h}</div>` : "";
 }
-
+/* FAVORIT (wishlist) */
+let _favs = new Set();
+async function refreshFavs(){
+  if(!currentUser()){ _favs=new Set(); return; }
+  try{
+    const res = await fetch("/api/favorites");
+    _favs = new Set(res.ok ? ((await res.json()).ids || []) : []);
+  }catch(e){ _favs=new Set(); }
+}
+function heartBtnHTML(id){
+  const on=_favs.has(id);
+  return `<button class="fav-btn${on?" on":""}" data-fav="${id}" aria-pressed="${on}" aria-label="Simpan ke favorit" onclick="event.stopPropagation();toggleFav(${id})"><span class="fav-ic">${on?"♥":"♡"}</span></button>`;
+}
+function favDetailBtnHTML(id){
+  const on=_favs.has(id);
+  return `<button class="btn btn-outline fav-detail${on?" on":""}" data-fav="${id}" aria-pressed="${on}" onclick="toggleFav(${id})"><span class="fav-ic">${on?"♥":"♡"}</span> <span class="fav-txt">${on?"Ada di Favorit":"Simpan ke Favorit"}</span></button>`;
+}
+function syncFavButtons(){
+  document.querySelectorAll("[data-fav]").forEach(b=>{
+    const on=_favs.has(+b.dataset.fav);
+    b.classList.toggle("on",on); b.setAttribute("aria-pressed",on);
+    const ic=b.querySelector(".fav-ic"); if(ic) ic.textContent=on?"♥":"♡";
+    const tx=b.querySelector(".fav-txt"); if(tx) tx.textContent=on?"Ada di Favorit":"Simpan ke Favorit";
+  });
+}
+async function toggleFav(id){
+  if(!requireLogin()) return;
+  const was=_favs.has(id);
+  if(was) _favs.delete(id); else _favs.add(id);
+  syncFavButtons();
+  const {ok,data}=await apiRequest(was?"DELETE":"POST","/api/favorites/"+id);
+  if(!ok){
+    if(was) _favs.add(id); else _favs.delete(id);
+    syncFavButtons(); toast(data.error||"Gagal memperbarui favorit."); return;
+  }
+  _favs=new Set(data.ids); syncFavButtons();
+  toast(was?"Dihapus dari favorit.":"Ditambahkan ke favorit.");
+  if(document.body.dataset.page==="favorit") renderFavorit();
+}
+async function renderFavorit(){
+  if(!requireLogin()) return;
+  const res=await fetch("/api/favorites");
+  const data=res.ok?await res.json():{ids:[],products:[]};
+  _favs=new Set(data.ids||[]);
+  const list=data.products||[];
+  list.forEach(p=>{ PRODUCTS_CACHE[p.id]=p; });
+  document.getElementById("favoritGrid").innerHTML = list.length ? list.map(productCardHTML).join("") :
+    `<div class="empty-state" style="grid-column:1/-1"><div>♡</div>Belum ada produk favorit.<br><br><button class="btn btn-primary btn-sm" onclick="go('katalog')">Lihat Katalog</button></div>`;
+  document.getElementById("footer-favorit").innerHTML = footerHTML();
+}
 /* HOME */
 function productCardHTML(p){
   const st=ratingOf(p);
   const last=st.latest;
   return `<div class="pcard" onclick="openDetail(${p.id})">
+    ${heartBtnHTML(p.id)}
     <div class="thumb">${productImgHTML(p)}</div>
     <div class="info">
       <div class="name">${esc(p.name)}</div>
@@ -452,6 +504,7 @@ async function renderDetail(){
         </div>
         <button class="btn btn-primary" onclick="addToCart(${p.id},detailQty)">Tambahkan ke Keranjang</button>
       </div>
+       <div style="margin-top:12px">${favDetailBtnHTML(p.id)}</div>
     </div>`;
   renderReviews(p);
   document.getElementById("footer-detail").innerHTML = footerHTML();
@@ -605,12 +658,27 @@ function renderVoucherBox(){
 
 /* CHECKOUT */
 const ZONES=[
-  {key:"batam",name:"Batam",rate:0,freeMin:0},
-  {key:"sumatra",name:"Sumatra & Kepri lainnya",rate:350000,freeMin:10000000},
-  {key:"jawa",name:"Jawa",rate:500000,freeMin:null},
-  {key:"kalsul",name:"Kalimantan & Sulawesi",rate:750000,freeMin:null},
-  {key:"timur",name:"Bali, NTB/NTT, Maluku & Papua",rate:1000000,freeMin:null}
+  {key:"batam",name:"Batam",rate:0,freeMin:0,transit:[1,2]},
+  {key:"sumatra",name:"Sumatra & Kepri lainnya",rate:350000,freeMin:10000000,transit:[3,5]},
+  {key:"jawa",name:"Jawa",rate:500000,freeMin:null,transit:[5,8]},
+  {key:"kalsul",name:"Kalimantan & Sulawesi",rate:750000,freeMin:null,transit:[7,10]},
+  {key:"timur",name:"Bali, NTB/NTT, Maluku & Papua",rate:1000000,freeMin:null,transit:[10,14]}
 ];
+const ETA_PROCESS=[1,3];
+function fmtRangeID(a,b){
+  const o={day:"numeric",month:"long",year:"numeric"};
+  if(a.toDateString()===b.toDateString()) return b.toLocaleDateString("id-ID",o);
+  const sameMonth=a.getMonth()===b.getMonth() && a.getFullYear()===b.getFullYear();
+  if(sameMonth) return a.getDate()+" – "+b.toLocaleDateString("id-ID",o);
+  if(a.getFullYear()===b.getFullYear()) return a.toLocaleDateString("id-ID",{day:"numeric",month:"long"})+" – "+b.toLocaleDateString("id-ID",o);
+  return a.toLocaleDateString("id-ID",o)+" – "+b.toLocaleDateString("id-ID",o);
+}
+function etaTextForZone(zone){
+  const a=new Date(), b=new Date();
+  a.setDate(a.getDate()+ETA_PROCESS[0]+zone.transit[0]);
+  b.setDate(b.getDate()+ETA_PROCESS[1]+zone.transit[1]);
+  return fmtRangeID(a,b);
+}
 const SIZE_UNITS={Sofa:3,Lemari:3,Meja:2,Kursi:1};
 let selectedZone=_ss("hw_zone","batam");
 let paymentProof=null;
@@ -707,6 +775,7 @@ async function renderCheckout(){
   const items=cartWithDetails();
   const u=currentUser();
   const ship=calcShipping(items);
+  const etaText=etaTextForZone(ship.zone);
   if(items.length===0){ document.getElementById("checkoutLayout").innerHTML=`<div class="empty-state" style="grid-column:1/-1"><div>🧾</div>Keranjang kosong, tidak ada yang bisa di-checkout.</div>`; document.getElementById("footer-checkout").innerHTML=footerHTML(); return; }
   const left = `
     <div class="card" style="margin-bottom:16px">
@@ -714,7 +783,10 @@ async function renderCheckout(){
       <p style="font-size:14px"><span class="muted" style="font-size:12px">Penerima (sesuai nama lengkap)</span><br><b>${esc(u.name)}</b><br>${esc(u.phone)}<br>${esc(u.address)}</p>
       <label class="zone-label">Wilayah tujuan (untuk hitung ongkir)</label>
       <select class="zone-select" onchange="chooseZone(this.value)">${ZONES.map(z=>`<option value="${z.key}" ${z.key===selectedZone?'selected':''}>${z.name}</option>`).join("")}</select>
-    </div>
+      <div class="eta-box">🚚 Estimasi tiba: <b>${etaText}</b>
+        <div class="muted">Perkiraan: pengemasan ${ETA_PROCESS[0]}–${ETA_PROCESS[1]} hari + pengiriman ${ship.zone.transit[0]}–${ship.zone.transit[1]} hari ke ${esc(ship.zone.name)}. Bisa berubah sesuai kondisi kurir.</div>
+      </div>
+    </div> 
     <div class="card">
       <h3 style="margin-top:0">2. Metode Pembayaran</h3>
       ${["Transfer Bank","QRIS","Bayar di Tempat (COD)"].map(m=>`
@@ -731,6 +803,7 @@ async function renderCheckout(){
       ${items.map(i=>`<div class="sum-row"><span>${esc(i.product.name)} x${i.qty}</span><span>${fmt(i.product.price*i.qty)}</span></div>`).join("")}
       <div class="sum-row"><span>Subtotal</span><span>${fmt(cartTotal())}</span></div>
       <div class="sum-row"><span>Ongkos Kirim (${ship.zone.name})</span><span>${ship.free?'<b style="color:var(--ok)">Gratis</b>':fmt(ship.fee)}</span></div>
+      <div class="sum-row"><span>Estimasi Tiba</span><span style="text-align:right">${etaText}</span></div>
       ${vch?`<div class="sum-row vch-row"><span>Diskon voucher</span><span>−${fmt(discount)}</span></div>`:""}
       <div class="sum-row total"><span>Total Bayar</span><span>${fmt(cartTotal()-discount+ship.fee)}</span></div>
       <button class="btn btn-primary btn-block" style="margin-top:14px" onclick="placeOrder()">Buat Pesanan</button>
@@ -948,6 +1021,7 @@ async function renderProfile(){
       <div class="order-row">
         <div>
           <div style="font-weight:600;font-size:14px">${o.id} · ${o.date}</div>
+          ${o.eta?`<div class="order-eta">🚚 ${o.status==="Dikirim"?"Estimasi tiba":"Perkiraan tiba"}: ${esc(o.eta.text)}</div>`:""}
           <div style="font-size:12.5px;color:var(--muted)">${o.items.map(i=>esc(i.name)+" x"+i.qty).join(", ")}</div>
         </div>
         <div style="text-align:right">
@@ -1389,6 +1463,7 @@ function toggleMobileMenu(force){
   if(page==="reset-password") initResetPage();
   await refreshAuth();
   await refreshCart();
+  await refreshFavs();
   showPage(page);
   if(page==="tentang"||page==="kontak") document.getElementById("footer-"+page).innerHTML = footerHTML();
   const pt=sessionStorage.getItem("hw_pendingToast");
