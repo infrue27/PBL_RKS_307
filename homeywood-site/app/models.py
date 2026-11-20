@@ -123,6 +123,19 @@ class CartItem(db.Model):
 
     user = db.relationship("User")
     product = db.relationship("Product")
+    
+
+class Favorite(db.Model):
+    __tablename__ = "favorites"
+    __table_args__ = (db.UniqueConstraint("user_id", "product_id", name="uq_favorite_user_product"),)
+
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    product_id = db.Column(db.Integer, db.ForeignKey("products.id", ondelete="CASCADE"), nullable=False)
+    created_at = db.Column(db.DateTime, server_default=db.func.now())
+
+    user = db.relationship("User")
+    product = db.relationship("Product")
 
 
 class Order(db.Model):
