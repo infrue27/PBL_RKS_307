@@ -16,7 +16,7 @@
 
 <br>
 
-**Tim Pengembang · PBL_RKS_307 · RKS 2A Pagi**
+**Tim Pengembang · PBL_RKS_307 · RKS 3A Pagi**
 
 | Nama | NIM |
 |---|---|
