@@ -4,7 +4,7 @@ import re
 import string
 import secrets
 from decimal import Decimal
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Blueprint, current_app, jsonify, request
 from flask_login import current_user, login_required
@@ -23,6 +23,14 @@ ZONES = {
     "jawa":    {"name": "Jawa", "rate": 500000, "free_min": None},
     "kalsul":  {"name": "Kalimantan & Sulawesi", "rate": 750000, "free_min": None},
     "timur":   {"name": "Bali, NTB/NTT, Maluku & Papua", "rate": 1000000, "free_min": None},
+}
+PROCESS_DAYS = (1, 3)
+TRANSIT_DAYS = {
+    "batam":   (1, 2),
+    "sumatra": (3, 5),
+    "jawa":    (5, 8),
+    "kalsul":  (7, 10),
+    "timur":   (10, 14),
 }
 VALID_METHODS = {"Transfer Bank", "QRIS", "Bayar di Tempat (COD)"}
 SIZE_UNITS = {"Sofa": 3, "Lemari": 3, "Meja": 2, "Kursi": 1}
@@ -44,6 +52,39 @@ def format_tanggal_id(dt):
     if not dt:
         return ""
     return f"{dt.day} {BULAN_ID[dt.month]} {dt.year}"
+
+def format_range_id(start, end):
+    if start.date() == end.date():
+        return format_tanggal_id(end)
+    if (start.year, start.month) == (end.year, end.month):
+        return f"{start.day} – {end.day} {BULAN_ID[end.month]} {end.year}"
+    if start.year == end.year:
+        return f"{start.day} {BULAN_ID[start.month]} – {end.day} {BULAN_ID[end.month]} {end.year}"
+    return f"{format_tanggal_id(start)} – {format_tanggal_id(end)}"
+
+
+def estimate_eta(order):
+    if order.status in ("selesai", "ditolak", "dibatalkan") or order.zone not in TRANSIT_DAYS:
+        return None
+    t_min, t_max = TRANSIT_DAYS[order.zone]
+    if order.status == "dikirim":
+        base = order.shipped_at or order.updated_at or order.created_at
+        lo, hi = t_min, t_max
+    else:
+        base = order.created_at
+        lo, hi = PROCESS_DAYS[0] + t_min, PROCESS_DAYS[1] + t_max
+    if not base:
+        return None
+    start, end = base + timedelta(days=lo), base + timedelta(days=hi)
+    now = datetime.now()
+    if end < now:
+        start, end = now, now + (end - start)
+    return {
+        "start": start.date().isoformat(),
+        "end": end.date().isoformat(),
+        "text": format_range_id(start, end),
+        "zone": ZONES[order.zone]["name"],
+    }
 
 
 def calc_shipping(items_with_products, zone_key):
@@ -164,6 +205,7 @@ def order_to_dict(order):
         "voucherName": voucher_label(order.voucher_code),
         "total": float(order.total_amount),
         "payment": order.payment_label,
+        "eta": estimate_eta(order),
         "proof": proof_url,
         "status": STATUS_LABELS.get(order.status, order.status),
         "date": format_tanggal_id(order.created_at),
@@ -279,6 +321,7 @@ def create_order():
         recipient_name=current_user.full_name,
         recipient_phone=current_user.phone,
         payment_label=payment_label,
+        zone=zone_key,
         status="diproses" if is_cod else ("menunggu_pembayaran" if is_qris else "menunggu_verifikasi"),
     )
     db.session.add(order)
@@ -373,5 +416,6 @@ def admin_ship_order(order_code):
     if order.status != "diproses":
         return jsonify({"error": f"Order berstatus '{STATUS_LABELS.get(order.status, order.status)}', belum bisa dikirim."}), 400
     order.status = "dikirim"
+    order.shipped_at = datetime.now()
     db.session.commit()
     return jsonify({"order": admin_order_to_dict(order)})
