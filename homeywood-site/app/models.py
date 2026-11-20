@@ -138,6 +138,8 @@ class Order(db.Model):
     recipient_name = db.Column(db.String(100))
     recipient_phone = db.Column(db.String(20))
     payment_label = db.Column(db.String(100))
+    zone = db.Column(db.String(20))
+    shipped_at = db.Column(db.DateTime)
     reviews = db.relationship("Review", back_populates="order")
     status = db.Column(db.Enum(*ORDER_STATUSES), nullable=False, default="menunggu_pembayaran")
     created_at = db.Column(db.DateTime, server_default=db.func.now())
